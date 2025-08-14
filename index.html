@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirChat - محادثات خاصة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* نظام الألوان والمظهر العام: Cosmic-Tech Theme */
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #02001A 0%, #000000 50%, #02001A 100%);
+            color: #E0E7FF;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden; /* لمنع شريط التمرير الأفقي */
+            position: relative;
+        }
+
+        /* تأثير الخلفية الديناميكية */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 30%, rgba(0, 200, 255, 0.08), transparent 55%),
+                        radial-gradient(circle at 80% 70%, rgba(150, 0, 255, 0.08), transparent 55%);
+            background-size: 300% 300%;
+            animation: cosmic-drift 80s infinite alternate ease-in-out;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @keyframes cosmic-drift {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 100% 100%; }
+        }
+
+        /* Glassmorphism Panel: لوحات زجاجية احترافية */
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.5s ease-in-out;
+        }
+        .glass-panel:hover {
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+            transform: translateY(-4px);
+        }
+
+        /* شريط التمرير الاحترافي */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        ::-webkit-scrollbar-thumb {
+            background-color: #00E5FF;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* التخطيط العام للصفحة */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2.5rem;
+            padding: 2rem;
+            width: 100%;
+            max-width: 1800px;
+            margin: 0 auto;
+            flex-grow: 1;
+            align-items: flex-start;
+        }
+        @media (max-width: 1280px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* الهيدر (Header) */
+        header {
+            @apply glass-panel;
+            border-radius: 0 0 2rem 2rem;
+            padding: 1.5rem 3rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            z-index: 100;
+            position: sticky;
+            top: 0;
+            transform: translateY(0); /* لإزالة تأثير الهوفر من الكلاس الأساسي */
+        }
+        header:hover {
+            transform: none; /* تعطيل تأثير الهوفر على الهيدر */
+            box-shadow: none;
+        }
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            color: #00E5FF;
+            text-shadow: 0 0 10px #00E5FF;
+            transition: all 0.3s ease;
+        }
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .user-profile:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 12px rgba(52, 211, 153, 0.7);
+        }
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid #34D399;
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+        }
+        .username {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #E0E7FF;
+        }
+        .user-id {
+            font-size: 0.9rem;
+            color: #A0AEC0;
+        }
+
+        /* الأقسام الجانبية والدردشة */
+        .panel {
+            @apply glass-panel;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* قائمة الأصدقاء (Friends List) */
+        #left-panel {
+            min-height: 700px;
+        }
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00E5FF;
+            text-align: center;
+            text-shadow: 0 0 8px #00E5FF;
+            margin-bottom: 1.5rem;
+        }
+        #search-friend-input {
+            width: 100%;
+            padding: 0.8rem 1.2rem;
+            border-radius: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background-color: rgba(0, 0, 0, 0.2);
+            color: #E0E7FF;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        #search-friend-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.4);
+            border-color: #00E5FF;
+        }
+        .friends-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+        .friend-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.2rem;
+            border-radius: 1.5rem;
+            background-color: rgba(255, 255, 255, 0.04);
+            margin-bottom: 0.6rem;
+            cursor: pointer;
+            transition: all 0.4s ease;
+        }
+        .friend-item:hover, .friend-item.active {
+            background-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+        }
+        .friend-item img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid #00E5FF;
+        }
+        .friend-info {
+            flex-grow: 1;
+        }
+        .friend-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .friend-status {
+            font-size: 0.9rem;
+            color: #A0AEC0;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #EF4444;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+        .online .status-dot {
+            background-color: #34D399;
+            box-shadow: 0 0 6px #34D399;
+        }
+
+        /* منطقة الدردشة (Chat Area) */
+        #chat-area {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            min-height: 700px;
+        }
+        #chat-header {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #chat-header img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 4px solid #8B5CF6;
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
+        }
+        #chat-header h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #34D399;
+        }
+        #chat-messages-display {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .chat-message {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+            animation: fadeInMessage 0.3s ease-out;
+        }
+        .chat-message.sent {
+            justify-content: flex-end;
+        }
+        .chat-message.received {
+            justify-content: flex-start;
+        }
+        .message-bubble {
+            max-width: 70%;
+            padding: 1rem 1.5rem;
+            border-radius: 1.5rem;
+            font-size: 1.1rem;
+        }
+        .chat-message.sent .message-bubble {
+            background: linear-gradient(45deg, #00E5FF, #007ACC);
+            color: white;
+            border-bottom-left-radius: 0.5rem;
+        }
+        .chat-message.received .message-bubble {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #E0E7FF;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom-right-radius: 0.5rem;
+        }
+        .timestamp {
+            font-size: 0.8rem;
+            color: #A0AEC0;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+
+        #chat-input-area {
+            display: flex;
+            gap: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 0.8rem 1.2rem;
+            border-radius: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background-color: rgba(0, 0, 0, 0.3);
+            color: #E0E7FF;
+            font-size: 1rem;
+        }
+        #message-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.4);
+            border-color: #34D399;
+        }
+        .btn-send {
+            @apply bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition-all duration-300;
+        }
+
+        /* نظام الإشعارات (Toast Notification) */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            @apply glass-panel;
+            padding: 15px 25px;
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease-in-out;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <header>
+        <div class="logo">AirChat</div>
+        <div class="user-profile">
+            <img src="https://i.ibb.co/3s6q2P5/avatar.png" alt="User Avatar" class="user-avatar">
+            <div class="user-info text-right">
+                <span class="username">محمد عبدالله</span>
+                <span class="user-id">#4589</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-layout flex-grow">
+
+        <section id="left-panel" class="panel">
+            <h2 class="panel-title">قائمة الأصدقاء</h2>
+
+            <input type="text" id="search-friend-input" placeholder="ابحث عن صديق...">
+
+            <div id="friends-list" class="friends-list-container">
+                <div class="friend-item online" data-friend-id="1">
+                    <img src="https://i.ibb.co/g42L8P3/user1.png" alt="صورة المستخدم 1">
+                    <div class="friend-info">
+                        <div class="friend-name">علي أحمد</div>
+                        <div class="friend-status">
+                            <span class="status-dot"></span>
+                            <span>متصل الآن</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="friend-item" data-friend-id="2">
+                    <img src="https://i.ibb.co/L8m2F1c/user2.png" alt="صورة المستخدم 2">
+                    <div class="friend-info">
+                        <div class="friend-name">فاطمة محمد</div>
+                        <div class="friend-status">
+                            <span class="status-dot"></span>
+                            <span>غير متصل</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="right-panel" class="panel flex-grow">
+            <div id="chat-area" class="flex flex-col h-full">
+                <div id="chat-header" class="hidden">
+                    <img id="chat-partner-avatar" src="" alt="صورة الطرف الآخر">
+                    <div class="partner-info">
+                        <h2 id="chat-partner-name"></h2>
+                        <p id="chat-partner-status"></p>
+                    </div>
+                </div>
+
+                <div id="chat-messages-display" class="flex-grow hidden">
+                    <div class="chat-message received">
+                        <div class="message-bubble">
+                            مرحباً! كيف حالك اليوم؟
+                        </div>
+                        <span class="timestamp">10:30 صباحًا</span>
+                    </div>
+                    <div class="chat-message sent">
+                        <div class="message-bubble">
+                            أهلاً بك! أنا بخير الحمد لله، وأنت؟
+                        </div>
+                        <span class="timestamp">10:31 صباحًا <i class="fas fa-check-double text-blue-400"></i></span>
+                    </div>
+                </div>
+
+                <div id="chat-input-area" class="hidden mt-auto">
+                    <input type="text" id="message-input" placeholder="اكتب رسالتك...">
+                    <button id="send-message-btn" class="btn-send">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+
+                <div id="welcome-message" class="flex flex-col items-center justify-center h-full text-center text-gray-400">
+                    <i class="fas fa-comments text-6xl text-gray-600 mb-4"></i>
+                    <h3 class="text-2xl font-bold">ابدأ محادثة باختيار صديق</h3>
+                    <p class="mt-2">اضغط على اسم أحد الأصدقاء من القائمة اليسرى لبدء الدردشة.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const friends = [
+            { id: 1, name: "علي أحمد", avatar: "https://i.ibb.co/g42L8P3/user1.png", online: true },
+            { id: 2, name: "فاطمة محمد", avatar: "https://i.ibb.co/L8m2F1c/user2.png", online: false },
+            { id: 3, name: "عبدالله سالم", avatar: "https://i.ibb.co/b3j62W1/user3.png", online: true },
+            { id: 4, name: "ليلى خالد", avatar: "https://i.ibb.co/S68Q2rP/user4.png", online: true },
+        ];
+
+        const friendsList = document.getElementById('friends-list');
+        const chatArea = document.getElementById('chat-area');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const chatHeader = document.getElementById('chat-header');
+        const chatPartnerName = document.getElementById('chat-partner-name');
+        const chatPartnerAvatar = document.getElementById('chat-partner-avatar');
+        const chatPartnerStatus = document.getElementById('chat-partner-status');
+        const chatMessagesDisplay = document.getElementById('chat-messages-display');
+        const chatInputArea = document.getElementById('chat-input-area');
+        const toast = document.getElementById('toast');
+
+        // وظيفة لعرض قائمة الأصدقاء ديناميكياً
+        function renderFriendsList() {
+            friendsList.innerHTML = '';
+            friends.forEach(friend => {
+                const friendItem = document.createElement('div');
+                friendItem.classList.add('friend-item', 'transition-all');
+                if (friend.online) {
+                    friendItem.classList.add('online');
+                }
+                friendItem.setAttribute('data-friend-id', friend.id);
+                friendItem.innerHTML = `
+                    <img src="${friend.avatar}" alt="صورة المستخدم ${friend.name}">
+                    <div class="friend-info">
+                        <div class="friend-name">${friend.name}</div>
+                        <div class="friend-status">
+                            <span class="status-dot"></span>
+                            <span>${friend.online ? 'متصل الآن' : 'غير متصل'}</span>
+                        </div>
+                    </div>
+                `;
+                friendItem.addEventListener('click', () => openChat(friend));
+                friendsList.appendChild(friendItem);
+            });
+        }
+
+        // وظيفة لفتح شاشة الدردشة مع صديق محدد
+        function openChat(friend) {
+            // إخفاء رسالة الترحيب وعرض منطقة الدردشة
+            welcomeMessage.classList.add('hidden');
+            chatHeader.classList.remove('hidden');
+            chatMessagesDisplay.classList.remove('hidden');
+            chatInputArea.classList.remove('hidden');
+
+            // تحديث معلومات الصديق في الهيدر
+            chatPartnerAvatar.src = friend.avatar;
+            chatPartnerName.textContent = friend.name;
+            chatPartnerStatus.textContent = friend.online ? 'متصل الآن' : 'غير متصل';
+
+            // إزالة حالة النشاط من جميع الأصدقاء
+            document.querySelectorAll('.friend-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // إضافة حالة النشاط للصديق المختار
+            document.querySelector(`[data-friend-id="${friend.id}"]`).classList.add('active');
+
+            // هنا يمكنك تحميل الرسائل الخاصة بهذا الصديق من قاعدة البيانات (كود وهمي حاليًا)
+            chatMessagesDisplay.innerHTML = `
+                <div class="chat-message received">
+                    <div class="message-bubble">
+                        مرحباً ${friend.name}! كيف حالك؟
+                    </div>
+                    <span class="timestamp">10:30 صباحًا</span>
+                </div>
+                <div class="chat-message sent">
+                    <div class="message-bubble">
+                        أهلاً بك! أنا بخير الحمد لله، وأنت؟
+                    </div>
+                    <span class="timestamp">10:31 صباحًا <i class="fas fa-check-double text-blue-400"></i></span>
+                </div>
+            `;
+            // التمرير إلى أسفل تلقائياً
+            chatMessagesDisplay.scrollTop = chatMessagesDisplay.scrollHeight;
+        }
+
+        // وظيفة لإرسال رسالة
+        document.getElementById('send-message-btn').addEventListener('click', () => {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            if (message) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('chat-message', 'sent');
+                messageElement.innerHTML = `
+                    <div class="message-bubble">${message}</div>
+                    <span class="timestamp">${new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} <i class="fas fa-check-double text-blue-400"></i></span>
+                `;
+                chatMessagesDisplay.appendChild(messageElement);
+                messageInput.value = '';
+                chatMessagesDisplay.scrollTop = chatMessagesDisplay.scrollHeight;
+                showToast("تم إرسال الرسالة بنجاح!", "success");
+            }
+        });
+        
+        // وظيفة لإظهار رسالة إشعار (Toast)
+        function showToast(message, type = "info") {
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // بدء عرض قائمة الأصدقاء عند تحميل الصفحة
+        window.onload = renderFriendsList;
+
+    </script>
+</body>
+</html>
