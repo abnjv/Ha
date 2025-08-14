@@ -1,753 +1,0 @@
-import React, { useState } from 'react';
-import { Mic, User, Gift, Award, Monitor, X, VolumeX, Crown, Music, Globe, ChevronsUp, ChevronDown, Sparkles, Wand, Bot, Library, Palette, LayoutDashboard, DollarSign, Zap, Star, Heart, Briefcase, Camera, Layers, Landmark, Image, PlusSquare, LogIn, UserPlus } from 'lucide-react';
-import { Transition } from 'react-transition-group';
-
-// الكود بالكامل داخل المكون الرئيسي App
-export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentPage, setCurrentPage] = useState('room');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [roomMood, setRoomMood] = useState('calm');
-  const [message, setMessage] = useState('');
-  const [isApiLoading, setIsApiLoading] = useState(false);
-  const [modal, setModal] = useState({ isOpen: false, title: '', content: '' });
-
-  // Gemini API URL و key
-  const apiKey = "";
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-  // بيانات المستخدمين المحاكية (Simulated User Data)
-  const [currentUser, setCurrentUser] = useState({
-    id: 'user-1',
-    name: 'سالم',
-    level: 35,
-    avatar: 'https://placehold.co/100x100/A0B9C9/000?text=S',
-    role: 'owner',
-    coins: 5000,
-    badges: ['المؤسس', 'مستكشف الفضاء', 'مبدع المحتوى', 'قائد المجتمع'],
-    isCreator: true,
-  });
-
-  const [users, setUsers] = useState([
-    { id: 'user-2', name: 'لانا', level: 18, avatar: 'https://placehold.co/100x100/F0D9C9/000?text=L', role: 'moderator' },
-    { id: 'user-3', name: 'أحمد', level: 12, avatar: 'https://placehold.co/100x100/C9F0D9/000?text=A', role: 'user' },
-    { id: 'user-4', name: 'AI Bot', level: 99, avatar: 'https://placehold.co/100x100/38B2AC/FFF?text=AI', role: 'bot' },
-    { id: 'user-5', name: 'سارة', level: 20, avatar: 'https://placehold.co/100x100/D9C9F0/000?text=S', role: 'user' },
-    { id: 'user-6', name: 'فهد', level: 5, avatar: 'https://placehold.co/100x100/C9D9F0/000?text=F', role: 'user' },
-  ]);
-
-  const [chatMessages, setChatMessages] = useState([
-    { user: 'لانا', text: 'أهلاً بالجميع، نقاش ممتع!', time: '10:05' },
-    { user: 'سالم', text: 'فلنبدأ النقاش حول المستقبل!', time: '10:06' },
-    { user: 'AI Bot', text: 'مرحباً، أنا بوت المساعدة في الغرفة. كيف يمكنني المساعدة؟', time: '10:07', isBot: true },
-  ]);
-
-  const [missions, setMissions] = useState([
-    { id: 1, title: 'أرسل 5 رسائل في الدردشة', reward: 50, completed: false },
-    { id: 2, title: 'غير جو الغرفة إلى "متحمس"', reward: 75, completed: false },
-    { id: 3, title: 'شارك لحظة جديدة', reward: 100, completed: false },
-  ]);
-
-  const [moments, setMoments] = useState([
-    { user: 'لانا', image: 'https://placehold.co/400x300/F0D9C9/000?text=مشهد+طبيعي', caption: 'استمتعوا بهذا المنظر الهادئ!' },
-    { user: 'أحمد', image: 'https://placehold.co/400x300/C9F0D9/000?text=فضاء+رقمي', caption: 'صورة من عالمي الافتراضي المفضل.' },
-  ]);
-
-  const duration = 300;
-  const defaultStyle = {
-    transition: `transform ${duration}ms ease-in-out`,
-    transform: 'translateX(100%)',
-  };
-  const transitionStyles = {
-    entering: { transform: 'translateX(100%)' },
-    entered: { transform: 'translateX(0%)' },
-    exiting: { transform: 'translateX(100%)' },
-    exited: { transform: 'translateX(100%)' },
-  };
-
-  const roomBackgrounds = {
-    calm: 'bg-slate-950',
-    excited: 'bg-gradient-to-br from-purple-900 to-indigo-950',
-    focused: 'bg-slate-800'
-  };
-
-  // دالة مخصصة لإظهار الرسائل بدلاً من alert()
-  const showModal = (title, content) => {
-    setModal({ isOpen: true, title, content });
-  };
-  const closeModal = () => {
-    setModal({ isOpen: false, title: '', content: '' });
-  };
-
-  // دالة لإرسال طلب إلى Gemini API
-  const callGeminiAPI = async (prompt) => {
-    setIsApiLoading(true);
-    let chatHistory = [];
-    chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-    const payload = { contents: chatHistory };
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      setIsApiLoading(false);
-      if (result.candidates && result.candidates.length > 0 &&
-          result.candidates[0].content && result.candidates[0].content.parts &&
-          result.candidates[0].content.parts.length > 0) {
-        return result.candidates[0].content.parts[0].text;
-      } else {
-        throw new Error('Invalid API response');
-      }
-    } catch (error) {
-      setIsApiLoading(false);
-      showModal('خطأ في الاتصال', 'حدث خطأ أثناء التواصل مع Gemini API. الرجاء المحاولة لاحقاً.');
-      console.error('API call error:', error);
-      return null;
-    }
-  };
-
-  // المكونات الفرعية للعرض
-  const Sidebar = () => (
-    <Transition in={isSidebarOpen} timeout={duration}>
-      {state => (
-        <div style={{ ...defaultStyle, ...transitionStyles[state] }}
-          className="fixed inset-y-0 right-0 z-50 w-64 bg-slate-900 shadow-lg text-white p-4 flex flex-col justify-between">
-          <div className="flex flex-col gap-4">
-            <h2 className="text-xl font-bold mb-4 flex justify-between items-center">
-              القائمة
-              <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-white">
-                <X size={24} />
-              </button>
-            </h2>
-            <button onClick={() => { setCurrentPage('room'); setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-              <Globe size={20} />
-              <span>الغرفة الرئيسية</span>
-            </button>
-            <button onClick={() => { setCurrentPage('profile'); setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-              <User size={20} />
-              <span>الملف الشخصي</span>
-            </button>
-            {currentUser.isCreator && (
-              <button onClick={() => { setCurrentPage('creator'); setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-                <Palette size={20} />
-                <span>أدوات المبدعين</span>
-              </button>
-            )}
-            <button onClick={() => { setCurrentPage('dao'); setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-              <Landmark size={20} />
-              <span>الإدارة اللامركزية</span>
-            </button>
-            <button onClick={() => { setCurrentPage('ar'); setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-              <Camera size={20} />
-              <span>تفاعل الواقع</span>
-            </button>
-            <button onClick={() => { setCurrentPage('library'); setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-              <Library size={20} />
-              <span>مكتبة المحتوى</span>
-            </button>
-            <button onClick={() => { /* ... */ setIsSidebarOpen(false); }} className="flex items-center gap-2 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-              <Monitor size={20} />
-              <span>استكشاف العوالم</span>
-            </button>
-          </div>
-          <div className="text-sm text-slate-400">
-            <p>تطبيق ميتافيرس v3.2</p>
-          </div>
-        </div>
-      )}
-    </Transition>
-  );
-
-  // مكون صفحة تسجيل الدخول (Login Page)
-  const LoginPage = () => {
-    const [isSignUp, setIsSignUp] = useState(false);
-    
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-950 text-white p-4">
-        <div className="bg-slate-900 p-8 rounded-3xl shadow-xl w-full max-w-sm border border-slate-800 text-center">
-          <div className="flex justify-center mb-6">
-            <Globe size={64} className="text-blue-500 animate-pulse" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">{isSignUp ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</h1>
-          <p className="text-slate-400 mb-6">أدخل بياناتك للانضمام إلى الغرفة</p>
-          <form className="flex flex-col gap-4">
-            <input
-              type="text"
-              placeholder="اسم المستخدم"
-              className="p-3 bg-slate-800 rounded-lg border border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="password"
-              placeholder="كلمة المرور"
-              className="p-3 bg-slate-800 rounded-lg border border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {isSignUp && (
-              <input
-                type="password"
-                placeholder="تأكيد كلمة المرور"
-                className="p-3 bg-slate-800 rounded-lg border border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            )}
-            <button
-              type="submit"
-              onClick={() => setIsLoggedIn(true)}
-              className="mt-4 w-full py-3 bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors font-bold shadow-lg"
-            >
-              {isSignUp ? 'إنشاء الحساب' : 'تسجيل الدخول'}
-            </button>
-          </form>
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="mt-4 text-blue-400 hover:text-blue-300 text-sm transition-colors"
-          >
-            {isSignUp ? 'هل لديك حساب بالفعل؟ سجل الدخول.' : 'ليس لديك حساب؟ قم بإنشاء واحد.'}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // مكون الغرفة الرئيسية (Room View)
-  const RoomView = () => {
-    // دوال محاكاة للميزات (Simulated Feature Functions)
-    const handleMute = (userId, userName) => {
-      console.log(`محاكاة: كتم صوت المستخدم ${userName} (${userId})`);
-      showModal('كتم الصوت', `تم كتم صوت ${userName}`);
-    };
-    const handleKick = (userId, userName) => {
-      console.log(`محاكاة: طرد المستخدم ${userName} (${userId})`);
-      showModal('طرد من الغرفة', `تم طرد ${userName} من الغرفة`);
-    };
-
-    // دالة لتلخيص النقاش باستخدام Gemini API
-    const handleAISummary = async () => {
-      const chatText = chatMessages.map(msg => `${msg.user}: ${msg.text}`).join('\n');
-      const prompt = `Summarize the following chat conversation in Arabic, highlighting the main points and key topics discussed:\n\n${chatText}`;
-      const summary = await callGeminiAPI(prompt);
-      if (summary) {
-        showModal('✨ ملخص النقاش بالذكاء الاصطناعي', summary);
-      }
-    };
-
-    // دالة لإنشاء عالم جديد باستخدام Gemini API
-    const handleAIGenWorld = async () => {
-      const userPrompt = prompt("اكتب وصفاً قصيراً للعالم الذي تتخيله (مثال: مدينة مستقبلية عائمة)");
-      if (!userPrompt) return;
-
-      const prompt = `Based on the following description, create a detailed and immersive world setting description for a metaverse room. Focus on visuals, atmosphere, and key features. Respond in Arabic.\n\nDescription: ${userPrompt}`;
-      const worldDescription = await callGeminiAPI(prompt);
-      if (worldDescription) {
-        showModal('✨ عالم جديد من تصميم الذكاء الاصطناعي', worldDescription);
-      }
-    };
-    
-    // دالة لتوليد مهام جديدة بالذكاء الاصطناعي
-    const handleAIGenMission = async () => {
-      const currentMood = roomMood === 'calm' ? 'هادئ' : roomMood === 'excited' ? 'متحمس' : 'مركز';
-      const prompt = `As a game master in a metaverse room with a "${currentMood}" mood, suggest a creative and engaging mission for users. The mission should be a short, single sentence. The mission title should be prefixed with "مهمة:". Respond in Arabic.`;
-      const newMissionTitle = await callGeminiAPI(prompt);
-      if (newMissionTitle) {
-        setMissions(prev => [...prev, { id: Date.now(), title: newMissionTitle, reward: 150, completed: false }]);
-        showModal('✨ مهمة جديدة بالذكاء الاصطناعي', `تم إنشاء مهمة جديدة: ${newMissionTitle}`);
-      }
-    };
-
-    const handleSetMood = (mood) => {
-      setRoomMood(mood);
-      showModal('تغيير جو الغرفة', `تم تغيير جو الغرفة إلى ${mood === 'calm' ? 'هادئ' : mood === 'excited' ? 'متحمس' : 'مركز'}`);
-    };
-
-    const handleSendMessage = async (e) => {
-      e.preventDefault();
-      if (!message.trim()) return;
-
-      const newMessage = { user: currentUser.name, text: message, time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) };
-      setChatMessages(prev => [...prev, newMessage]);
-
-      // Check if the message is a question or command for the AI Bot
-      if (message.toLowerCase().startsWith('@ai bot')) {
-        const userCommand = message.replace(/@ai bot/i, '').trim().toLowerCase();
-        
-        let botResponse = null;
-
-        // Command to change room mood
-        if (userCommand.includes('غير جو الغرفة') && userCommand.includes('هادئ')) {
-          handleSetMood('calm');
-          botResponse = 'تم تغيير جو الغرفة إلى هادئ بناءً على طلبك.';
-        } else if (userCommand.includes('غير جو الغرفة') && userCommand.includes('حماسي')) {
-          handleSetMood('excited');
-          botResponse = 'تم تغيير جو الغرفة إلى حماسي بناءً على طلبك.';
-        } else if (userCommand.includes('غير جو الغرفة') && userCommand.includes('مركز')) {
-          handleSetMood('focused');
-          botResponse = 'تم تغيير جو الغرفة إلى مركز بناءً على طلبك.';
-        } 
-        // Command to recommend library content
-        else if (userCommand.includes('اقتراح') || userCommand.includes('اوصي') && userCommand.includes('محتوى')) {
-          const prompt = `As an AI bot, recommend some content from a library based on this user request: "${userCommand}". The library contains assets like "Star effect" and "Clapping sound effect". Respond with a friendly, helpful message in Arabic listing the recommendations and why they are suitable.`;
-          botResponse = await callGeminiAPI(prompt);
-        }
-        // General question for the AI Bot
-        else {
-          const prompt = `As an AI assistant in a digital room, respond to the following user query in a helpful and friendly way. Respond in Arabic.\n\nUser: ${userCommand}`;
-          botResponse = await callGeminiAPI(prompt);
-        }
-
-        if (botResponse) {
-          const newBotMessage = { user: 'AI Bot', text: botResponse, time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }), isBot: true };
-          setChatMessages(prev => [...prev, newBotMessage]);
-        }
-      }
-
-      setMessage('');
-    };
-
-    const handleShareMoment = () => {
-      const imageUrl = prompt("أدخل رابط الصورة التي تريد مشاركتها:");
-      const caption = prompt("أدخل تعليقًا على الصورة:");
-      if (imageUrl && caption) {
-        const newMoment = { user: currentUser.name, image: imageUrl, caption: caption };
-        setMoments(prev => [...prev, newMoment]);
-        showModal('تمت المشاركة', 'تمت مشاركة لحظتك بنجاح!');
-      }
-    };
-
-    const handleClaimMission = (missionId, reward) => {
-      const updatedMissions = missions.map(m =>
-        m.id === missionId ? { ...m, completed: true } : m
-      );
-      setMissions(updatedMissions);
-      setCurrentUser(prev => ({ ...prev, coins: prev.coins + reward }));
-      showModal('تهانينا!', `لقد أكملت المهمة وحصلت على ${reward} قطعة ذهبية!`);
-    };
-
-    return (
-      <div className={`flex flex-col h-screen text-white p-4 transition-colors duration-500 ${roomBackgrounds[roomMood]}`}>
-        {/* شريط الأدوات العلوي (Top Toolbar) */}
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-slate-200">غرفة المستقبل الرقمي</h1>
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700 transition-colors">
-            <Mic size={24} />
-          </button>
-        </div>
-
-        {/* عرض المتحدثين (Speaker Avatars) */}
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 overflow-y-auto bg-slate-900 bg-opacity-70 rounded-xl shadow-inner">
-          {/* المتحدث الحالي (Current Speaker) */}
-          <div className="flex flex-col items-center gap-2 p-2 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700 shadow-lg relative transform transition-all duration-300 hover:scale-105">
-            <div className="w-16 h-16 rounded-full bg-slate-700 border-4 border-white flex items-center justify-center text-3xl font-bold text-white relative">
-              <span className="text-sm absolute -bottom-1 right-0 bg-blue-500 text-white rounded-full px-2">
-                {currentUser.level}
-              </span>
-              <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full rounded-full object-cover" />
-              {currentUser.role === 'owner' && <Crown size={20} className="absolute top-0 left-0 text-yellow-300" />}
-            </div>
-            <p className="font-semibold text-sm truncate w-20 text-center">{currentUser.name} (أنت)</p>
-          </div>
-          {/* باقي المستخدمين (Other Users) */}
-          {users.map((user) => (
-            <div key={user.id} className="flex flex-col items-center gap-2 p-2 rounded-xl bg-slate-800 shadow relative transform transition-all duration-300 hover:scale-105">
-              <div className="w-16 h-16 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-3xl font-bold text-white relative">
-                <span className="text-sm absolute -bottom-1 right-0 bg-blue-500 text-white rounded-full px-2">
-                  {user.level}
-                </span>
-                <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
-                {user.role === 'moderator' && <Crown size={20} className="absolute top-0 left-0 text-gray-400" />}
-                {user.role === 'bot' && <Bot size={20} className="absolute top-0 left-0 text-cyan-400" />}
-              </div>
-              <p className="font-semibold text-sm truncate w-20 text-center">{user.name}</p>
-              {/* أدوات المشرف (Moderator Tools) - تظهر فقط للمشرف أو المالك */}
-              {(currentUser.role === 'owner' || currentUser.role === 'moderator') && (
-                <div className="absolute top-0 right-0 flex gap-1 p-1">
-                  <button onClick={() => handleMute(user.id, user.name)} className="p-1 bg-slate-900 rounded-full text-slate-300 hover:bg-red-500 hover:text-white transition-colors">
-                    <VolumeX size={16} />
-                  </button>
-                  <button onClick={() => handleKick(user.id, user.name)} className="p-1 bg-slate-900 rounded-full text-slate-300 hover:bg-red-500 hover:text-white transition-colors">
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* منطقة المهام واللحظات (Missions & Moments Section) */}
-        <div className="flex flex-col mt-4 gap-4 md:flex-row">
-            {/* المهام (Missions) */}
-            <div className="flex-1 bg-slate-900 bg-opacity-70 rounded-xl shadow-lg p-4">
-              <h2 className="text-lg font-bold text-slate-200 mb-2 flex items-center gap-2">
-                <Heart size={20} className="text-red-400" />
-                المهام اليومية
-              </h2>
-              <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
-                {missions.map(mission => (
-                  <div key={mission.id} className="flex items-center justify-between p-2 bg-slate-800 rounded-lg shadow">
-                    <p className={`text-sm text-slate-300 ${mission.completed ? 'line-through opacity-50' : ''}`}>{mission.title}</p>
-                    <button
-                      onClick={() => handleClaimMission(mission.id, mission.reward)}
-                      disabled={mission.completed}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${mission.completed ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500'}`}
-                    >
-                      {mission.completed ? 'تمت' : `مطالبة (${mission.reward} 🪙)`}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={handleAIGenMission}
-                className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-cyan-600 rounded-lg hover:bg-cyan-500 transition-colors shadow font-bold text-sm"
-              >
-                {isApiLoading ? <div className="loader ease-linear rounded-full border-2 border-t-2 border-white h-5 w-5 animate-spin"></div> : <PlusSquare size={16} />}
-                مهمة جديدة بالذكاء الاصطناعي
-              </button>
-            </div>
-            {/* اللحظات (Moments) */}
-            <div className="flex-1 bg-slate-900 bg-opacity-70 rounded-xl shadow-lg p-4">
-              <h2 className="text-lg font-bold text-slate-200 mb-2 flex items-center gap-2">
-                <Image size={20} className="text-blue-400" />
-                لحظات
-              </h2>
-              <div className="flex gap-4 overflow-x-auto p-2">
-                {moments.map((moment, index) => (
-                  <div key={index} className="flex-shrink-0 w-40 bg-slate-800 rounded-lg shadow overflow-hidden">
-                    <img src={moment.image} alt={moment.caption} className="w-full h-24 object-cover" />
-                    <div className="p-2">
-                      <p className="text-xs font-bold text-slate-200">{moment.user}</p>
-                      <p className="text-xs text-slate-400">{moment.caption}</p>
-                    </div>
-                  </div>
-                ))}
-                <button
-                  onClick={handleShareMoment}
-                  className="flex-shrink-0 w-40 h-40 bg-slate-800 rounded-lg shadow flex flex-col items-center justify-center text-slate-400 hover:bg-slate-700 transition-colors"
-                >
-                  <PlusSquare size={32} />
-                  <span className="text-sm mt-2">شارك لحظة</span>
-                </button>
-              </div>
-            </div>
-        </div>
-
-        {/* شريط الإجراءات السفلي (Bottom Actions Bar) */}
-        <div className="mt-4 p-4 bg-slate-900 bg-opacity-70 rounded-xl shadow-lg flex flex-wrap justify-center gap-3">
-          <button onClick={() => showModal('تأثيرات صوتية', 'محاكاة: تم تشغيل مؤثرات صوتية')} className="flex flex-col items-center gap-1 p-2 bg-slate-800 rounded-lg hover:bg-pink-600 transition-colors shadow">
-            <Music size={20} />
-            <span className="text-xs">مؤثرات</span>
-          </button>
-          <button onClick={handleAISummary} className="flex flex-col items-center gap-1 p-2 bg-slate-800 rounded-lg hover:bg-purple-600 transition-colors shadow">
-            {isApiLoading ? <div className="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5 animate-spin"></div> : <ChevronsUp size={20} />}
-            <span className="text-xs">ملخص AI ✨</span>
-          </button>
-          <button onClick={handleAIGenWorld} className="flex flex-col items-center gap-1 p-2 bg-slate-800 rounded-lg hover:bg-yellow-600 transition-colors shadow">
-            {isApiLoading ? <div className="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5 animate-spin"></div> : <Wand size={20} />}
-            <span className="text-xs">عالم AI ✨</span>
-          </button>
-          {/* محاكاة لنظام المشاعر */}
-          <div className="flex items-center gap-2 p-2 bg-slate-800 rounded-lg shadow">
-            <span className="text-xs font-semibold text-slate-400">جو الغرفة:</span>
-            <button onClick={() => handleSetMood('calm')} className={`p-1 rounded-full ${roomMood === 'calm' ? 'bg-indigo-500' : 'bg-slate-600'} transition-colors`}>
-              <Star size={16} />
-            </button>
-            <button onClick={() => handleSetMood('excited')} className={`p-1 rounded-full ${roomMood === 'excited' ? 'bg-orange-500' : 'bg-slate-600'} transition-colors`}>
-              <Zap size={16} />
-            </button>
-            <button onClick={() => handleSetMood('focused')} className={`p-1 rounded-full ${roomMood === 'focused' ? 'bg-cyan-500' : 'bg-slate-600'} transition-colors`}>
-              <Layers size={16} />
-            </button>
-          </div>
-          {/* محاكاة للتكامل مع العمل المشترك */}
-          <button onClick={() => showModal('عمل مشترك', 'محاكاة: فتح مستند Google Docs للعمل عليه')} className="flex flex-col items-center gap-1 p-2 bg-slate-800 rounded-lg hover:bg-teal-600 transition-colors shadow">
-            <Briefcase size={20} />
-            <span className="text-xs">عمل مشترك</span>
-          </button>
-        </div>
-
-        {/* منطقة الدردشة النصية (Text Chat) */}
-        <div className="flex flex-col mt-4 bg-slate-900 bg-opacity-70 rounded-xl shadow-lg h-40 p-4">
-          <div className="flex-1 overflow-y-auto text-sm text-slate-300">
-            {chatMessages.map((msg, index) => (
-              <p key={index} className={`mb-1 ${msg.isBot ? 'text-cyan-300' : ''}`}>
-                <span className={`font-bold ${msg.isBot ? 'text-cyan-200' : 'text-slate-200'}`}>[{msg.time}] {msg.user}:</span> {msg.text}
-              </p>
-            ))}
-          </div>
-          <form onSubmit={handleSendMessage} className="flex mt-2 gap-2">
-            <input
-              type="text"
-              placeholder="اكتب رسالتك..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="flex-1 p-2 bg-slate-800 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-white"
-            />
-            <button type="submit" className="p-2 bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors shadow">
-              <ChevronDown size={20} className="transform rotate-90" />
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
-  // مكون الملف الشخصي (Profile View)
-  const ProfileView = () => {
-    return (
-      <div className={`flex flex-col items-center h-screen text-white p-6 ${roomBackgrounds.calm}`}>
-        <div className="flex justify-between w-full items-center mb-6">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700 transition-colors">
-            <Mic size={24} />
-          </button>
-          <h1 className="text-2xl font-bold text-slate-200">الملف الشخصي</h1>
-          <div></div>
-        </div>
-        <div className="flex flex-col items-center gap-4 bg-slate-900 p-8 rounded-3xl shadow-xl w-full max-w-sm mb-8">
-          <div className="w-24 h-24 rounded-full bg-slate-700 border-4 border-blue-500 flex items-center justify-center text-4xl font-bold text-white relative">
-            <span className="text-sm absolute -bottom-1 right-0 bg-blue-500 text-white rounded-full px-2">
-              {currentUser.level}
-            </span>
-            <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full rounded-full object-cover" />
-          </div>
-          <p className="text-2xl font-bold">{currentUser.name}</p>
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
-            <DollarSign size={16} className="text-yellow-400" />
-            <p>
-              <span className="font-bold text-lg text-yellow-400">{currentUser.coins}</span> قطعة ذهبية
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col items-center bg-slate-900 p-6 rounded-3xl shadow-xl w-full max-w-sm mb-8">
-          <h2 className="text-xl font-bold mb-4 text-slate-200">إنجازاتي وشاراتي</h2>
-          <div className="flex flex-wrap justify-center gap-4">
-            {currentUser.badges.map((badge, index) => (
-              <div key={index} className="flex flex-col items-center gap-1 p-2 bg-slate-800 rounded-lg shadow-inner">
-                <Award size={24} className="text-yellow-500" />
-                <span className="text-xs font-semibold">{badge}</span>
-              </div>
-            ))}
-            <div className="flex flex-col items-center gap-1 p-2 bg-slate-800 rounded-lg shadow-inner text-slate-500">
-              <Gift size={24} />
-              <span className="text-xs font-semibold">مكافأة قادمة</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  // مكون أدوات المبدعين (Creator Tools View)
-  const CreatorToolsView = () => {
-    const handleCreatePaidRoom = () => {
-      console.log("محاكاة: إنشاء غرفة مدفوعة");
-      showModal('إنشاء غرفة مدفوعة', 'تم إنشاء غرفة خاصة. يمكنك الآن تحديد سعر الاشتراك.');
-    };
-    const handleSetChallenge = () => {
-      console.log("محاكاة: إطلاق تحدي جديد");
-      showModal('إطلاق تحدي جديد', 'تم إطلاق تحدي جديد! سيتم إخطار المستخدمين.');
-    };
-    const handleOpenStore = () => {
-      console.log("محاكاة: فتح متجر أصول رقمية");
-      showModal('فتح متجر', 'تم فتح متجرك الشخصي. يمكنك الآن إضافة أصولك للبيع.');
-    };
-    const handleStartFund = () => {
-      console.log("محاكاة: إنشاء صندوق نمو للمشاريع");
-      showModal('صندوق نمو', 'تم إنشاء صندوق نمو. يمكنك الآن جمع التبرعات لدعم مشاريع المجتمع.');
-    };
-
-    return (
-      <div className={`flex flex-col items-center h-screen text-white p-6 ${roomBackgrounds.calm}`}>
-        <div className="flex justify-between w-full items-center mb-6">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700 transition-colors">
-            <Mic size={24} />
-          </button>
-          <h1 className="text-2xl font-bold text-slate-200">أدوات المبدعين</h1>
-          <div></div>
-        </div>
-        <div className="flex flex-col gap-6 bg-slate-900 p-8 rounded-3xl shadow-xl w-full max-w-sm">
-          <button onClick={handleCreatePaidRoom} className="flex items-center gap-4 p-4 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors shadow-lg">
-            <DollarSign size={48} />
-            <div className="flex-1 text-right">
-              <p className="font-bold">إنشاء غرفة مدفوعة</p>
-              <p className="text-sm">بناء مجتمع حصري واشتراكات</p>
-            </div>
-          </button>
-          <button onClick={handleSetChallenge} className="flex items-center gap-4 p-4 bg-green-600 rounded-xl hover:bg-green-500 transition-colors shadow-lg">
-            <Sparkles size={48} />
-            <div className="flex-1 text-right">
-              <p className="font-bold">إطلاق تحدي جديد</p>
-              <p className="text-sm">حفز مجتمعك بالمكافآت</p>
-            </div>
-          </button>
-          <button onClick={handleOpenStore} className="flex items-center gap-4 p-4 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors shadow-lg">
-            <LayoutDashboard size={48} />
-            <div className="flex-1 text-right">
-              <p className="font-bold">افتح متجرك الخاص</p>
-              <p className="text-sm">بيع الأصول الرقمية للمجتمع</p>
-            </div>
-          </button>
-          <button onClick={handleStartFund} className="flex items-center gap-4 p-4 bg-red-600 rounded-xl hover:bg-red-500 transition-colors shadow-lg">
-            <TrendingUp size={48} />
-            <div className="flex-1 text-right">
-              <p className="font-bold">ابدأ صندوقاً للمشاريع</p>
-              <p className="text-sm">جمع التبرعات لدعم الإبداع</p>
-            </div>
-          </button>
-        </div>
-      </div>
-    );
-  };
-  
-  // مكون الإدارة اللامركزية (Community DAO View)
-  const CommunityDAOView = () => {
-    const handleVote = (vote) => {
-      showModal('التصويت', `صوتك تم تسجيله: ${vote === 'yes' ? 'مع' : 'ضد'}. شكراً لمشاركتك!`);
-    };
-
-    return (
-      <div className={`flex flex-col items-center h-screen text-white p-6 ${roomBackgrounds.calm}`}>
-        <div className="flex justify-between w-full items-center mb-6">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700 transition-colors">
-            <Mic size={24} />
-          </button>
-          <h1 className="text-2xl font-bold text-slate-200">الإدارة اللامركزية</h1>
-          <div></div>
-        </div>
-        <div className="bg-slate-900 p-8 rounded-3xl shadow-xl w-full max-w-md">
-          <h2 className="text-xl font-bold mb-4 text-slate-200 flex items-center gap-2">
-            <Landmark size={24} />
-            مقترحات المجتمع
-          </h2>
-          <div className="mb-6 p-4 bg-slate-800 rounded-lg shadow-inner">
-            <h3 className="font-bold text-lg mb-2 text-slate-100">مقترح #1: نظام مكافآت للمشرفين</h3>
-            <p className="text-sm text-slate-300 mb-4">
-              هذا المقترح يهدف إلى تخصيص نسبة من الأرباح لمكافأة المشرفين المتميزين.
-              التصويت سيحدد ما إذا كان هذا النظام سيُفعّل أم لا.
-            </p>
-            <div className="flex justify-center gap-4">
-              <button onClick={() => handleVote('yes')} className="px-6 py-2 bg-green-600 rounded-full hover:bg-green-500 transition-colors font-bold shadow">
-                نعم (موافق)
-              </button>
-              <button onClick={() => handleVote('no')} className="px-6 py-2 bg-red-600 rounded-full hover:bg-red-500 transition-colors font-bold shadow">
-                لا (غير موافق)
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  // مكون الواقع المعزز (AR View)
-  const ARView = () => {
-    const [cameraOn, setCameraOn] = useState(false);
-    const handleToggleCamera = () => {
-      setCameraOn(!cameraOn);
-      if (!cameraOn) {
-        showModal('الواقع المعزز', 'محاكاة: تم تشغيل الكاميرا. يمكنك الآن وضع بوابة افتراضية في غرفتك!');
-      }
-    };
-
-    return (
-      <div className={`flex flex-col items-center h-screen text-white p-6 ${roomBackgrounds.calm}`}>
-        <div className="flex justify-between w-full items-center mb-6">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700 transition-colors">
-            <Mic size={24} />
-          </button>
-          <h1 className="text-2xl font-bold text-slate-200">تفاعل الواقع المدمج</h1>
-          <div></div>
-        </div>
-        <div className="flex flex-col items-center bg-slate-900 p-8 rounded-3xl shadow-xl w-full max-w-md">
-          <h2 className="text-xl font-bold mb-4 text-slate-200">بوابة الميتافيرس</h2>
-          <div className="w-full h-64 bg-slate-800 rounded-xl border-4 border-dashed border-slate-600 flex items-center justify-center relative overflow-hidden">
-            {cameraOn && (
-              <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://placehold.co/600x400/38B2AC/FFF?text=صورة+من+الكاميرا+الخلفية')" }}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 rounded-full border-4 border-blue-500 animate-pulse flex items-center justify-center p-4 bg-blue-500 bg-opacity-20 text-center">
-                    <p className="text-sm font-semibold">بوابة إلى الغرفة الرقمية</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            {!cameraOn && <p className="text-slate-400">كاميرا الواقع المعزز متوقفة</p>}
-          </div>
-          <button onClick={handleToggleCamera} className="mt-4 px-6 py-2 bg-blue-600 rounded-full hover:bg-blue-500 transition-colors font-bold shadow">
-            {cameraOn ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // مكون مكتبة المحتوى (Content Library View)
-  const ContentLibraryView = () => {
-    return (
-      <div className={`flex flex-col items-center h-screen text-white p-6 ${roomBackgrounds.calm}`}>
-        <div className="flex justify-between w-full items-center mb-6">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-800 rounded-lg shadow hover:bg-slate-700 transition-colors">
-            <Mic size={24} />
-          </button>
-          <h1 className="text-2xl font-bold text-slate-200">مكتبة المحتوى</h1>
-          <div></div>
-        </div>
-        <div className="flex flex-col items-center bg-slate-900 p-8 rounded-3xl shadow-xl w-full max-w-lg mb-8">
-          <h2 className="text-xl font-bold mb-4 text-slate-200">الأصول المشتركة</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col items-center gap-2 p-4 bg-slate-800 rounded-xl shadow-lg">
-              <Star size={48} className="text-yellow-400" />
-              <p className="text-sm font-semibold">تأثير نجمة</p>
-              <button className="px-4 py-1 mt-2 bg-blue-600 rounded-full hover:bg-blue-500 transition-colors text-sm">استخدام</button>
-            </div>
-            <div className="flex flex-col items-center gap-2 p-4 bg-slate-800 rounded-xl shadow-lg">
-              <Music size={48} className="text-pink-400" />
-              <p className="text-sm font-semibold">مؤثر صوت "تصفيق"</p>
-              <button className="px-4 py-1 mt-2 bg-blue-600 rounded-full hover:bg-blue-500 transition-colors text-sm">استخدام</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  // مكون رسالة مخصص (Custom Modal)
-  const CustomModal = ({ title, content, onClose }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div className="bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4 border border-slate-700">
-        <h3 className="text-xl font-bold text-slate-200 mb-4">{title}</h3>
-        <p className="text-slate-300 mb-6 whitespace-pre-wrap">{content}</p>
-        <button onClick={onClose} className="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors font-bold shadow">
-          إغلاق
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="font-sans antialiased text-white bg-slate-950">
-      {!isLoggedIn ? (
-        <LoginPage />
-      ) : (
-        <>
-          {currentPage === 'room' && <RoomView />}
-          {currentPage === 'profile' && <ProfileView />}
-          {currentPage === 'creator' && <CreatorToolsView />}
-          {currentPage === 'dao' && <CommunityDAOView />}
-          {currentPage === 'ar' && <ARView />}
-          {currentPage === 'library' && <ContentLibraryView />}
-          
-          <Sidebar />
-          {isSidebarOpen && <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black bg-opacity-50 z-40"></div>}
-        </>
-      )}
-      
-      {modal.isOpen && <CustomModal title={modal.title} content={modal.content} onClose={closeModal} />}
-
-      {/* CSS Loader for API calls */}
-      <style>{`
-        .loader {
-          border-color: #f3f3f3;
-          border-top-color: #3498db;
-        }
-      `}</style>
-    </div>
-  );
-}
