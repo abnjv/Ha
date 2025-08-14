@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق الرسائل الصوتية</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0f7fa; /* لون خلفية خفيف */
+        }
+        .container {
+            max-width: 600px;
+        }
+        .message-box {
+            background-color: #ffffff;
+            border-left: 4px solid #00acc1;
+        }
+        .message-box p {
+            margin: 0;
+            line-height: 1.5;
+        }
+        .record-button {
+            transition: all 0.2s ease-in-out;
+            transform: scale(1);
+        }
+        .record-button.recording {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 172, 193, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(0, 172, 193, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 172, 193, 0); }
+        }
+        /* Custom modal styles */
+        .modal {
+            display: none;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: #fff;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Application Container -->
+    <div class="container bg-white p-6 rounded-lg shadow-xl border border-gray-200">
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-center text-teal-600 mb-6">تطبيق الرسائل الصوتية</h1>
+        <p class="text-center text-gray-500 mb-6">يمكنك تسجيل رسالة ومشاركتها مع الآخرين</p>
+
+        <!-- Recording Section -->
+        <div class="flex flex-col items-center mb-8">
+            <button id="recordButton" class="record-button w-20 h-20 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 focus:outline-none">
+                <i id="recordIcon" class="fas fa-microphone text-3xl"></i>
+            </button>
+            <p id="statusMessage" class="mt-4 text-gray-700 font-semibold"></p>
+        </div>
+
+        <!-- Messages Display Section -->
+        <div id="messagesContainer" class="space-y-4">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2 mb-4">الرسائل الصوتية</h2>
+            <!-- Messages will be injected here by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Custom Modal for Messages -->
+    <div id="messageModal" class="modal fixed inset-0 z-50 overflow-auto flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-content bg-white w-11/12 md:max-w-md mx-auto rounded-lg shadow-lg z-50 p-6">
+            <div class="modal-header flex justify-between items-center pb-3">
+                <p class="font-bold text-2xl">تنبيه</p>
+                <button class="modal-close cursor-pointer z-50 text-gray-500 hover:text-gray-700" onclick="document.getElementById('messageModal').style.display='none'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body text-gray-700">
+                <p id="modalMessageText"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // Global variables for Firebase configuration and app details
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+        let userId = null;
+
+        // Elements from the DOM
+        const recordButton = document.getElementById('recordButton');
+        const recordIcon = document.getElementById('recordIcon');
+        const statusMessage = document.getElementById('statusMessage');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const modalMessageText = document.getElementById('modalMessageText');
+        const messageModal = document.getElementById('messageModal');
+
+        // Recording variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Show a custom modal message
+        function showMessage(message) {
+            modalMessageText.textContent = message;
+            messageModal.style.display = 'flex';
+        }
+
+        // Initialize Firebase Authentication
+        async function initializeAuth() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser?.uid;
+            } catch (error) {
+                console.error("Authentication Error:", error);
+                showMessage("فشل في تسجيل الدخول. يرجى المحاولة مرة أخرى.");
+            }
+        }
+
+        // Start listening for auth state changes and data
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("User authenticated:", userId);
+                // Start listening to messages once authenticated
+                startListeningForMessages();
+            } else {
+                console.log("User is signed out.");
+            }
+        });
+
+        // Start/Stop recording functionality
+        recordButton.addEventListener('click', async () => {
+            if (!userId) {
+                showMessage("الرجاء الانتظار حتى يتم تسجيل الدخول.");
+                return;
+            }
+            if (isRecording) {
+                // Stop recording
+                mediaRecorder.stop();
+                isRecording = false;
+                recordButton.classList.remove('recording');
+                recordIcon.classList.remove('fa-stop');
+                recordIcon.classList.add('fa-microphone');
+                statusMessage.textContent = 'تم الإيقاف';
+            } else {
+                try {
+                    // Start recording
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.addEventListener('dataavailable', event => {
+                        audioChunks.push(event.data);
+                    });
+                    mediaRecorder.addEventListener('stop', async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        // Show a loading message
+                        statusMessage.textContent = 'جارٍ رفع الرسالة...';
+
+                        // Upload the audio file to Firebase Storage
+                        const storageRef = ref(storage, `artifacts/${appId}/public/data/voice_messages/${userId}/${Date.now()}.webm`);
+                        await uploadBytes(storageRef, audioBlob);
+                        const downloadURL = await getDownloadURL(storageRef);
+                        
+                        // Save the download URL to Firestore
+                        const voiceMessagesCollectionRef = collection(db, `artifacts/${appId}/public/data/voice_messages`);
+                        await addDoc(voiceMessagesCollectionRef, {
+                            audioUrl: downloadURL,
+                            timestamp: serverTimestamp(),
+                            userId: userId
+                        });
+                        
+                        statusMessage.textContent = 'تم إرسال الرسالة بنجاح!';
+                    });
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordButton.classList.add('recording');
+                    recordIcon.classList.remove('fa-microphone');
+                    recordIcon.classList.add('fa-stop');
+                    statusMessage.textContent = 'جارٍ التسجيل...';
+                } catch (error) {
+                    console.error("Error accessing microphone:", error);
+                    showMessage("تعذر الوصول إلى الميكروفون. يرجى التحقق من الأذونات.");
+                }
+            }
+        });
+
+        // Function to render a single message
+        function renderMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-box p-4 rounded-lg shadow-sm border border-gray-200';
+            messageDiv.innerHTML = `
+                <div class="flex items-center space-x-2 space-x-reverse mb-2">
+                    <i class="fas fa-user-circle text-teal-500 text-xl"></i>
+                    <p class="font-bold text-gray-800">مستخدم (${message.userId.substring(0, 4)}...)</p>
+                </div>
+                <div class="flex items-center mt-2">
+                    <audio src="${message.audioUrl}" controls class="w-full"></audio>
+                </div>
+                <p class="text-sm text-gray-500 mt-2 text-left">${message.timestamp ? new Date(message.timestamp.seconds * 1000).toLocaleString('ar-SA') : 'الآن'}</p>
+            `;
+            messagesContainer.prepend(messageDiv);
+        }
+
+        // Listen for new messages from Firestore
+        function startListeningForMessages() {
+            const voiceMessagesCollectionRef = collection(db, `artifacts/${appId}/public/data/voice_messages`);
+            const q = query(voiceMessagesCollectionRef, orderBy('timestamp', 'desc'));
+
+            onSnapshot(q, (snapshot) => {
+                // Clear the container to avoid duplicates
+                messagesContainer.innerHTML = '<h2 class="text-xl font-bold text-gray-800 border-b pb-2 mb-4">الرسائل الصوتية</h2>';
+
+                snapshot.forEach((doc) => {
+                    const message = doc.data();
+                    renderMessage(message);
+                });
+            }, (error) => {
+                console.error("Error listening to messages:", error);
+                showMessage("فشل في تحميل الرسائل.");
+            });
+        }
+
+        // Initialize the app on window load
+        window.onload = function() {
+            initializeAuth();
+            showMessage(`مرحبًا بك! معرف المستخدم الخاص بك هو: ${userId}. شارك هذا المعرف مع أصدقائك.`);
+        }
+    </script>
+</body>
+</html>
