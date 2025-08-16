@@ -11,11 +11,16 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 // ===================================================================================================================
 
 let app, auth, db;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const appId = import.meta.env.VITE_APP_ID || 'default-app-id';
 
 const initializeFirebase = () => {
   try {
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    const firebaseConfigStr = import.meta.env.VITE_FIREBASE_CONFIG;
+    if (!firebaseConfigStr) {
+      console.error("Firebase config not found. Please set VITE_FIREBASE_CONFIG in your .env file.");
+      return;
+    }
+    const firebaseConfig = JSON.parse(firebaseConfigStr);
     if (Object.keys(firebaseConfig).length > 0 && !app) {
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
@@ -1411,7 +1416,7 @@ const App = () => {
   useEffect(() => {
     initializeFirebase();
     if (auth) {
-      const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+      const initialAuthToken = import.meta.env.VITE_INITIAL_AUTH_TOKEN || null;
       if (initialAuthToken) {
         signInWithCustomToken(auth, initialAuthToken).catch(error => {
           console.error("Error signing in with custom token:", error);
