@@ -5,17 +5,8 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// Mock data, will be replaced by props or state
-const voiceChatUsers = [
-  { id: 'user_1', name: 'أحمد', speaking: true, onStage: true, avatar: 'https://placehold.co/100x100/A855F7/FFFFFF?text=أ' },
-  { id: 'user_2', name: 'سارة', speaking: false, onStage: true, avatar: 'https://placehold.co/100x100/EC4899/FFFFFF?text=س' },
-  { id: 'user_3', name: 'خالد', speaking: false, onStage: true, avatar: 'https://placehold.co/100x100/2DD4BF/FFFFFF?text=خ' },
-  { id: 'user_4', name: 'نورا', speaking: false, onStage: false, avatar: 'https://placehold.co/60x60/F97316/FFFFFF?text=ن' },
-  { id: 'user_5', name: 'علي', speaking: false, onStage: false, avatar: 'https://placehold.co/60x60/3B82F6/FFFFFF?text=ع' },
-  { id: 'user_6', name: 'ليلى', speaking: true, onStage: false, avatar: 'https://placehold.co/60x60/8B5CF6/FFFFFF?text=ل' },
-  { id: 'user_7', name: 'فاطمة', speaking: false, onStage: false, avatar: 'https://placehold.co/60x60/EAB308/FFFFFF?text=ف' },
-  { id: 'user_8', name: 'يوسف', speaking: false, onStage: false, avatar: 'https://placehold.co/60x60/10B981/FFFFFF?text=ي' },
-];
+import { useAuth } from '../../context/AuthContext';
+import { deleteDoc } from 'firebase/firestore';
 
 const getCategorizedUsers = (users) => {
   const speakers = users.filter(user => user.onStage);
@@ -23,9 +14,9 @@ const getCategorizedUsers = (users) => {
   return { speakers, listeners };
 };
 
-
-const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, roomType, db, appId }) => {
-  const [users] = useState(voiceChatUsers);
+const VoiceChatRoom = ({ onBack, roomId, roomType }) => {
+  const { user, userProfile, db, appId } = useAuth();
+  const [participants, setParticipants] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const [localStream, setLocalStream] = useState(null);
@@ -180,7 +171,7 @@ const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, ro
       });
       return () => unsubscribe();
     }
-  }, [roomId, userId, db, appId]);
+  }, [roomId, db, appId]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -188,18 +179,55 @@ const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, ro
     }
   }, [messages, showChat]);
 
+  // Effect to manage user presence in the room
+  useEffect(() => {
+    if (!db || !user?.uid || !roomId || !userProfile) return;
+
+    const participantRef = doc(db, `/artifacts/${appId}/public/data/voice_rooms/${roomId}/participants`, user.uid);
+
+    // Add user to participants on mount
+    setDoc(participantRef, {
+      name: userProfile.name,
+      avatar: userProfile.avatar,
+      uid: user.uid,
+      joinedAt: serverTimestamp(),
+      onStage: false, // Default to listener
+      speaking: false,
+    }).catch(console.error);
+
+    // Listen for real-time updates to participants
+    const participantsColRef = collection(db, `/artifacts/${appId}/public/data/voice_rooms/${roomId}/participants`);
+    const q = query(participantsColRef);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedParticipants = [];
+      snapshot.forEach((doc) => {
+        fetchedParticipants.push({ id: doc.id, ...doc.data() });
+      });
+      setParticipants(fetchedParticipants);
+    }, (error) => {
+      console.error("Error fetching participants:", error);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribe();
+      deleteDoc(participantRef).catch(console.error);
+    };
+  }, [db, user, roomId, userProfile, appId]);
+
   // Function to update user's XP
   const updateXP = async (xpGain) => {
-    if (!db || !userId) return;
-    const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'data');
+    if (!db || !user?.uid) return;
+    const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
     try {
       const docSnap = await getDoc(userDocRef);
       if (docSnap.exists()) {
         const currentXP = docSnap.data().xp || 0;
+        // The onSnapshot listener in AuthContext will handle the local state update automatically
         await updateDoc(userDocRef, {
           xp: currentXP + xpGain
         });
-        setUserProfile(prev => ({ ...prev, xp: currentXP + xpGain }));
       }
     } catch (error) {
       console.error("Error updating XP:", error);
@@ -292,7 +320,7 @@ const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, ro
       const prompt = inputMessage.slice(inputMessage.indexOf(' ') + 1).trim();
       if (prompt) {
         await addDoc(collection(db, publicChatPath), {
-          senderId: userId,
+          senderId: user.uid,
           senderName: currentUser?.name || 'مجهول',
           text: inputMessage,
           createdAt: serverTimestamp(),
@@ -302,7 +330,7 @@ const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, ro
     } else {
       try {
         await addDoc(collection(db, publicChatPath), {
-          senderId: userId,
+          senderId: user.uid,
           senderName: currentUser?.name || 'مجهول',
           text: inputMessage,
           createdAt: serverTimestamp(),
@@ -356,7 +384,7 @@ const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, ro
     }
   };
 
-  const { speakers, listeners } = getCategorizedUsers(users);
+  const { speakers, listeners } = getCategorizedUsers(participants);
 
   // Determine the layout based on room type
   const isLargeHall = roomType === 'large_hall';
@@ -421,7 +449,7 @@ const VoiceChatRoom = ({ onBack, userId, roomId, userProfile, setUserProfile, ro
                 <TransitionGroup>
                   {messages.map((message) => (
                     <CSSTransition key={message.id} timeout={300} classNames="message-item">
-                      <div className={`message-item flex flex-col mb-2 p-3 rounded-lg ${message.isAI ? 'bg-indigo-900/50 text-white self-start' : (message.senderId === userId ? 'bg-blue-600/50 text-white self-end' : 'bg-gray-800/50 text-gray-200 self-start')} `}>
+                      <div className={`message-item flex flex-col mb-2 p-3 rounded-lg ${message.isAI ? 'bg-indigo-900/50 text-white self-start' : (message.senderId === user.uid ? 'bg-blue-600/50 text-white self-end' : 'bg-gray-800/50 text-gray-200 self-start')} `}>
                         <div className="flex items-center space-x-2 space-x-reverse">
                           <strong className="text-sm font-semibold">{message.senderName || 'مجهول'}</strong>
                           <span className="text-xs text-gray-400">{message.createdAt ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString('ar-SA') : 'الآن'}</span>

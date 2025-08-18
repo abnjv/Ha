@@ -2,8 +2,10 @@ import React, { useState, useContext } from 'react';
 import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
-const CreateRoomScreen = ({ onBack, userId, userProfile, onRoomCreated, db, appId }) => {
+const CreateRoomScreen = ({ onBack, onRoomCreated }) => {
+  const { user, userProfile, db, appId } = useAuth();
   const [roomTitle, setRoomTitle] = useState('');
   const [roomDescription, setRoomDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +21,7 @@ const CreateRoomScreen = ({ onBack, userId, userProfile, onRoomCreated, db, appI
       const newRoom = {
         title: roomTitle,
         description: roomDescription,
-        creatorId: userId,
+        creatorId: user.uid,
         creatorName: userProfile?.name || 'مجهول',
         isLocked: false,
         roomType: 'large_hall', // Default to large_hall
