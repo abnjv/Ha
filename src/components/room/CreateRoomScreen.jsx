@@ -28,6 +28,7 @@ const CreateRoomScreen = () => {
         isLocked: false,
         roomType: 'large_hall', // Default to large_hall
         createdAt: serverTimestamp(),
+        lastActivity: serverTimestamp(),
       };
       await addDoc(roomsCollectionRef, newRoom);
       navigate('/dashboard');

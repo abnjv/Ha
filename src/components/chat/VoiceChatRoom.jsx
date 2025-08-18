@@ -211,6 +211,11 @@ const VoiceChatRoom = () => {
       text: inputMessage,
       createdAt: serverTimestamp(),
     });
+
+    // Update room activity
+    const roomRef = doc(db, `/artifacts/${appId}/public/data/rooms`, roomId);
+    await updateDoc(roomRef, { lastActivity: serverTimestamp() });
+
     setInputMessage('');
     setIsSendingMessage(false);
   };

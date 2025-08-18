@@ -15,7 +15,7 @@ const MainDashboard = () => {
   useEffect(() => {
     if (!db) return;
     const roomsCollectionRef = collection(db, `/artifacts/${appId}/public/data/rooms`);
-    const q = query(roomsCollectionRef, orderBy('createdAt', 'desc'));
+    const q = query(roomsCollectionRef, orderBy('lastActivity', 'desc'));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedRooms = [];

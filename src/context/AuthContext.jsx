@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -102,12 +102,23 @@ export const AuthProvider = ({ children }) => {
     logout: () => signOut(auth),
     sendNotification: async (userId, notificationData) => {
       if (!db || !userId) return;
-      const notificationsPath = `/artifacts/${appId}/users/${userId}/notifications`;
-      await addDoc(collection(db, notificationsPath), {
-        ...notificationData,
-        read: false,
-        timestamp: serverTimestamp(),
-      });
+      try {
+        const notificationsPath = `/artifacts/${appId}/users/${userId}/notifications`;
+        await addDoc(collection(db, notificationsPath), {
+          ...notificationData,
+          read: false,
+          timestamp: serverTimestamp(),
+        });
+      } catch (error) {
+        console.error("Error sending notification:", error);
+        // Log error to a separate collection in Firestore
+        await addDoc(collection(db, "errorLogs"), {
+          context: "sendNotification",
+          error: error.message,
+          userId: userId,
+          timestamp: serverTimestamp(),
+        });
+      }
     },
   };
 
