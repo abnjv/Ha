@@ -2,8 +2,10 @@ import React, { useState, useContext } from 'react';
 import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
-const AddFriendScreen = ({ onBack, userId, db, appId }) => {
+const AddFriendScreen = ({ onBack }) => {
+  const { user, db, appId } = useAuth();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friendUserId, setFriendUserId] = useState('');
   const [message, setMessage] = useState('');
@@ -16,7 +18,7 @@ const AddFriendScreen = ({ onBack, userId, db, appId }) => {
     setIsLoading(true);
     setMessage('');
 
-    if (friendUserId === userId) {
+    if (friendUserId === user.uid) {
       setMessage('لا يمكنك إضافة نفسك كصديق.');
       setIsLoading(false);
       return;
@@ -34,7 +36,7 @@ const AddFriendScreen = ({ onBack, userId, db, appId }) => {
       }
 
       // Add to current user's friend list
-      const userFriendDocRef = doc(db, `/artifacts/${appId}/users/${userId}/friends`, friendUserId);
+      const userFriendDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/friends`, friendUserId);
       await setDoc(userFriendDocRef, {
         name: docSnap.data().name || 'مجهول',
         avatar: docSnap.data().avatar || `https://placehold.co/48x48/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${(docSnap.data().name || 'م').charAt(0)}`,
@@ -42,9 +44,9 @@ const AddFriendScreen = ({ onBack, userId, db, appId }) => {
       });
 
       // Add current user to friend's friend list
-      const friendFriendDocRef = doc(db, `/artifacts/${appId}/users/${friendUserId}/friends`, userId);
+      const friendFriendDocRef = doc(db, `/artifacts/${appId}/users/${friendUserId}/friends`, user.uid);
       // You should fetch the current user's profile to add their name/avatar
-      const userProfileRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'data');
+      const userProfileRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
       const userProfileSnap = await getDoc(userProfileRef);
       if (userProfileSnap.exists()) {
         await setDoc(friendFriendDocRef, {

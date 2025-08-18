@@ -2,8 +2,10 @@ import React, { useState, useEffect, useContext } from 'react';
 import { CornerUpLeft, Plus, Lock, Zap } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
-const MainDashboard = ({ onJoinRoom, onBack, userId, onCreateRoom, db, appId }) => {
+const MainDashboard = ({ onJoinRoom, onBack, onCreateRoom }) => {
+  const { user, db, appId } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
@@ -44,9 +46,9 @@ const MainDashboard = ({ onJoinRoom, onBack, userId, onCreateRoom, db, appId }) 
 
       <div className="flex-1 p-8">
         <h1 className="text-3xl md:text-4xl font-bold text-center mb-4">اختر غرفتك الفضائية</h1>
-        {userId && (
+        {user?.uid && (
           <p className="text-sm text-center text-gray-400 mb-8">
-            User ID: <span className="font-mono break-all">{userId}</span>
+            User ID: <span className="font-mono break-all">{user.uid}</span>
           </p>
         )}
         {isLoading ? (

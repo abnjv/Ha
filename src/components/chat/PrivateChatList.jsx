@@ -2,16 +2,18 @@ import React, { useState, useEffect, useContext } from 'react';
 import { CornerUpLeft, MessageSquare } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, onSnapshot } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
-const PrivateChatList = ({ onBack, onOpenChat, userId, db, appId }) => {
+const PrivateChatList = ({ onBack, onOpenChat }) => {
+  const { user, db, appId } = useAuth();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db || !userId) return;
+    if (!db || !user?.uid) return;
 
-    const privateDataPath = `/artifacts/${appId}/users/${userId}/friends`;
+    const privateDataPath = `/artifacts/${appId}/users/${user.uid}/friends`;
     const friendsCollectionRef = collection(db, privateDataPath);
     const q = query(friendsCollectionRef);
 

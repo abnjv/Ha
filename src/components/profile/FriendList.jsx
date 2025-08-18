@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { CornerUpLeft, UserPlus, UserMinus } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
-const FriendList = ({ onBack, userId, onAddFriend, onRemoveFriend, db, appId }) => {
+const FriendList = ({ onBack, onAddFriend }) => {
+  const { user, db, appId } = useAuth();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db || !userId) return;
-    const friendsCollectionRef = collection(db, `/artifacts/${appId}/users/${userId}/friends`);
+    if (!db || !user?.uid) return;
+    const friendsCollectionRef = collection(db, `/artifacts/${appId}/users/${user.uid}/friends`);
     const q = query(friendsCollectionRef);
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -26,7 +28,24 @@ const FriendList = ({ onBack, userId, onAddFriend, onRemoveFriend, db, appId }) 
     });
 
     return () => unsubscribe();
-  }, [userId, db, appId]);
+  }, [user, db, appId]);
+
+  const handleRemoveFriend = async (friendId) => {
+    if (!db || !user) return;
+    try {
+      // 1. Remove friend from current user's friend list
+      const userFriendRef = doc(db, `/artifacts/${appId}/users/${user.uid}/friends`, friendId);
+      await deleteDoc(userFriendRef);
+
+      // 2. Remove current user from friend's friend list
+      const friendUserRef = doc(db, `/artifacts/${appId}/users/${friendId}/friends`, user.uid);
+      await deleteDoc(friendUserRef);
+
+      console.log(`Removed friend: ${friendId}`);
+    } catch (error) {
+      console.error("Error removing friend:", error);
+    }
+  };
 
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
@@ -56,7 +75,7 @@ const FriendList = ({ onBack, userId, onAddFriend, onRemoveFriend, db, appId }) 
                   <span className="font-bold">{friend.name}</span>
                 </div>
                 <button
-                  onClick={() => onRemoveFriend(friend.id)}
+                  onClick={() => handleRemoveFriend(friend.id)}
                   className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors duration-200"
                 >
                   <UserMinus className="w-5 h-5" />

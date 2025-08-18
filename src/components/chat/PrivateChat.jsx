@@ -3,8 +3,10 @@ import { CornerUpLeft, Send as SendIcon } from 'lucide-react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
-const PrivateChat = ({ onBack, userId, friendId, friendName, db, appId }) => {
+const PrivateChat = ({ onBack, friendId, friendName }) => {
+  const { user, db, appId } = useAuth();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef(null);
@@ -13,9 +15,9 @@ const PrivateChat = ({ onBack, userId, friendId, friendName, db, appId }) => {
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
 
   useEffect(() => {
-    if (!db || !userId) return;
+    if (!db || !user?.uid) return;
 
-    const chatPartners = [userId, friendId].sort().join('_');
+    const chatPartners = [user.uid, friendId].sort().join('_');
     const privateChatPath = `/artifacts/${appId}/public/data/private_chats/${chatPartners}/messages`;
     const q = query(collection(db, privateChatPath), orderBy('createdAt'));
 
@@ -45,12 +47,12 @@ const PrivateChat = ({ onBack, userId, friendId, friendName, db, appId }) => {
     if (inputMessage.trim() === '' || !db || isSendingMessage) return;
 
     setIsSendingMessage(true);
-    const chatPartners = [userId, friendId].sort().join('_');
+    const chatPartners = [user.uid, friendId].sort().join('_');
     const privateChatPath = `/artifacts/${appId}/public/data/private_chats/${chatPartners}/messages`;
 
     try {
       await addDoc(collection(db, privateChatPath), {
-        senderId: userId,
+        senderId: user.uid,
         text: inputMessage,
         createdAt: serverTimestamp(),
       });
@@ -81,10 +83,10 @@ const PrivateChat = ({ onBack, userId, friendId, friendName, db, appId }) => {
             <TransitionGroup>
               {messages.map((message) => (
                 <CSSTransition key={message.id} timeout={300} classNames="message-item">
-                  <div className={`message-item flex ${message.senderId === userId ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xs md:max-w-md p-3 rounded-xl shadow-md ${message.senderId === userId ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}>
+                  <div className={`message-item flex ${message.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-xs md:max-w-md p-3 rounded-xl shadow-md ${message.senderId === user.uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}>
                       <p>{message.text}</p>
-                      <span className={`block mt-1 text-xs ${message.senderId === userId ? 'text-blue-200' : 'text-gray-500'}`}>
+                      <span className={`block mt-1 text-xs ${message.senderId === user.uid ? 'text-blue-200' : 'text-gray-500'}`}>
                         {message.createdAt ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString('ar-SA') : 'الآن'}
                       </span>
                     </div>

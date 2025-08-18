@@ -7,7 +7,10 @@ const getLevelFromXP = (xp) => {
   return Math.floor(Math.sqrt(xp / 100)) + 1;
 };
 
-const UserProfileScreen = ({ onBack, userId, userProfile, setUserProfile, db, appId }) => {
+import { useAuth } from '../../context/AuthContext';
+
+const UserProfileScreen = ({ onBack }) => {
+  const { user, userProfile, db, appId } = useAuth();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [isEditing, setIsEditing] = useState(false);
   const [newUserName, setNewUserName] = useState(userProfile?.name || '');
@@ -20,16 +23,15 @@ const UserProfileScreen = ({ onBack, userId, userProfile, setUserProfile, db, ap
   }, [userProfile]);
 
   const handleSaveProfile = async () => {
-    if (!db || !userId || !newUserName.trim() || isLoading) return;
+    if (!db || !user?.uid || !newUserName.trim() || isLoading) return;
 
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile`, 'data');
+      const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
+      // The onSnapshot listener in AuthContext will handle the local state update automatically
       await setDoc(userDocRef, {
-        ...userProfile,
         name: newUserName,
       }, { merge: true });
-      setUserProfile(prev => ({ ...prev, name: newUserName }));
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating user profile:", error);
