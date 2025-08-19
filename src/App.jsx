@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { CSSTransition } from 'react-transition-group';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, ThemeContext } from './context/ThemeProvider';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
+// Component Imports
 import LoginScreen from './components/auth/LoginScreen';
 import HomeScreen from './components/core/HomeScreen';
 import MainDashboard from './components/core/MainDashboard';
@@ -15,125 +18,51 @@ import FriendList from './components/profile/FriendList';
 import AddFriendScreen from './components/profile/AddFriendScreen';
 import UserProfileScreen from './components/profile/UserProfileScreen';
 
-// Mock data for notifications, as this feature is not yet connected to backend.
-const mockNotifications = [
-  { id: 1, type: 'friendRequest', user: 'فاطمة', message: 'طلبت صداقتك.' },
-  { id: 2, type: 'giftReceived', user: 'خالد', message: 'أرسل لك هدية 🎁.' },
-  { id: 3, type: 'roomInvite', user: 'علي', message: 'دعاك للانضمام إلى غرفة "نقاشات تقنية".' },
-];
+// ProtectedRoute component to guard routes that require authentication
+const ProtectedRoute = () => {
+  const { user, loading } = useAuth();
 
-const AppContent = () => {
-  const { user, logout } = useAuth();
-  const { themeClasses } = useContext(ThemeContext);
-
-  const [currentPage, setCurrentPage] = useState(user ? 'home' : 'login');
-  const [roomId, setRoomId] = useState(null);
-  const [roomType, setRoomType] = useState('large_hall');
-  const [privateChatFriendId, setPrivateChatFriendId] = useState(null);
-  const [privateChatFriendName, setPrivateChatFriendName] = useState('');
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState(mockNotifications);
-
-  useEffect(() => {
-    // Navigate user based on auth state
-    if (user && currentPage === 'login') {
-      setCurrentPage('home');
-    } else if (!user) {
-      setCurrentPage('login');
-    }
-  }, [user, currentPage]);
-
-  const handleClearNotifications = () => setNotifications([]);
-  const handleJoinRoom = (id, type) => {
-    setRoomId(id);
-    setRoomType(type);
-    setCurrentPage('voice-chat-room');
-  };
-  const handleOpenPrivateChat = (friendId, friendName) => {
-    setPrivateChatFriendId(friendId);
-    setPrivateChatFriendName(friendName);
-    setCurrentPage('private-chat');
-  };
-  const handleLogout = async () => {
-    await logout();
-    setCurrentPage('login');
-  };
-
-  const hasNotifications = notifications.length > 0;
-
-  let content;
-  switch (currentPage) {
-    case 'login':
-      content = <LoginScreen onLogin={() => setCurrentPage('home')} />;
-      break;
-    case 'home':
-      content = <HomeScreen
-        onGoToRooms={() => setCurrentPage('dashboard')}
-        onGoToPrivateChatList={() => setCurrentPage('private-chat-list')}
-        onLogout={handleLogout}
-        onGoToProfile={() => setCurrentPage('profile')}
-        onToggleNotifications={() => setShowNotifications(!showNotifications)}
-        hasNotifications={hasNotifications}
-        onGoToFriendList={() => setCurrentPage('friend-list')}
-      />;
-      break;
-    case 'dashboard':
-      content = <MainDashboard
-        onJoinRoom={handleJoinRoom}
-        onBack={() => setCurrentPage('home')}
-        onCreateRoom={() => setCurrentPage('create-room')}
-      />;
-      break;
-    case 'create-room':
-      content = <CreateRoomScreen
-        onBack={() => setCurrentPage('dashboard')}
-        onRoomCreated={() => setCurrentPage('dashboard')}
-      />;
-      break;
-    case 'voice-chat-room':
-      content = <VoiceChatRoom
-        onBack={() => setCurrentPage('dashboard')}
-        roomId={roomId}
-        roomType={roomType}
-      />;
-      break;
-    case 'private-chat-list':
-      content = <PrivateChatList
-        onBack={() => setCurrentPage('home')}
-        onOpenChat={handleOpenPrivateChat}
-      />;
-      break;
-    case 'private-chat':
-      content = <PrivateChat
-        onBack={() => setCurrentPage('private-chat-list')}
-        friendId={privateChatFriendId}
-        friendName={privateChatFriendName}
-      />;
-      break;
-    case 'friend-list':
-      content = <FriendList
-        onBack={() => setCurrentPage('home')}
-        onAddFriend={() => setCurrentPage('add-friend')}
-      />;
-      break;
-    case 'add-friend':
-      content = <AddFriendScreen
-        onBack={() => setCurrentPage('friend-list')}
-      />;
-      break;
-    case 'profile':
-      content = <UserProfileScreen
-        onBack={() => setCurrentPage('home')}
-      />;
-      break;
-    default:
-      content = <LoginScreen onLogin={() => setCurrentPage('home')} />;
+  if (loading) {
+    // Optional: show a loading spinner while checking auth state
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
-  return (
+  return user ? <Outlet /> : <Navigate to="/login" replace />;
+};
+
+const AppContent = () => {
+  const { themeClasses } = useContext(ThemeContext);
+  const { user, db, appId } = useAuth();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  // Set up real-time listener for notifications
+  useEffect(() => {
+    if (user && db) {
+      const notificationsPath = `/artifacts/${appId}/users/${user.uid}/notifications`;
+      const q = query(collection(db, notificationsPath), orderBy('timestamp', 'desc'));
+
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedNotifications = [];
+        querySnapshot.forEach((doc) => {
+          fetchedNotifications.push({ id: doc.id, ...doc.data() });
+        });
+        setNotifications(fetchedNotifications);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [user, db, appId]);
+
+  // This will be replaced with a real "mark as read" function later
+  const handleClearNotifications = () => setNotifications([]);
+  const hasUnreadNotifications = notifications.some(n => !n.read);
+
+  // This layout component can hold shared UI elements like the notification panel
+  const Layout = ({ children }) => (
     <div className={`min-h-screen ${themeClasses} antialiased`}>
-      {content}
-      {showNotifications && (
+      {children}
+      {user && showNotifications && (
         <CSSTransition in={showNotifications} timeout={500} classNames="notification-panel">
           <NotificationPanel
             notifications={notifications}
@@ -143,6 +72,29 @@ const AppContent = () => {
         </CSSTransition>
       )}
     </div>
+  );
+
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/login" element={<LoginScreen />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<HomeScreen onToggleNotifications={() => setShowNotifications(!showNotifications)} hasNotifications={hasUnreadNotifications} />} />
+          <Route path="/dashboard" element={<MainDashboard />} />
+          <Route path="/create-room" element={<CreateRoomScreen />} />
+          <Route path="/room/:roomId/:roomType" element={<VoiceChatRoom />} />
+          <Route path="/private-chat-list" element={<PrivateChatList />} />
+          <Route path="/chat/:friendId/:friendName" element={<PrivateChat />} />
+          <Route path="/friends" element={<FriendList />} />
+          <Route path="/add-friend" element={<AddFriendScreen />} />
+          <Route path="/profile" element={<UserProfileScreen />} />
+        </Route>
+
+        {/* Redirect any unknown paths to the home page if logged in, or login if not */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Layout>
   );
 };
 

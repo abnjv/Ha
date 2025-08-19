@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -93,6 +93,22 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
+  const sendNotification = async (targetUserId, type, message) => {
+    if (!db || !userProfile) return;
+    const notificationsPath = `/artifacts/${appId}/users/${targetUserId}/notifications`;
+    try {
+      await addDoc(collection(db, notificationsPath), {
+        type,
+        message,
+        user: userProfile.name, // The sender's name
+        read: false,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error sending notification:", error);
+    }
+  };
+
   const value = {
     user,
     userProfile,
@@ -101,6 +117,7 @@ export const AuthProvider = ({ children }) => {
     appId,
     isLoading,
     logout: () => signOut(auth),
+    sendNotification,
   };
 
   return (

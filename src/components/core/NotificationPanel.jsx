@@ -1,8 +1,47 @@
 import React from 'react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
-import { X, UserCheck, Gift, Users, CheckCircle } from 'lucide-react';
+import { X, UserCheck, Gift, Users, CheckCircle, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 
-const NotificationPanel = ({ notifications, onClear, onToggle }) => {
+const NotificationPanel = ({ notifications, onToggle }) => {
+  const { user, db, appId } = useAuth();
+
+  const handleMarkAsRead = async (notificationId) => {
+    if (!user || !db) return;
+    const notifRef = doc(db, `/artifacts/${appId}/users/${user.uid}/notifications`, notificationId);
+    try {
+      await updateDoc(notifRef, { read: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!user || !db || notifications.length === 0) return;
+
+    const batch = writeBatch(db);
+    notifications.forEach(notification => {
+      const notifRef = doc(db, `/artifacts/${appId}/users/${user.uid}/notifications`, notification.id);
+      batch.delete(notifRef);
+    });
+
+    try {
+      await batch.commit();
+    } catch (error) {
+      console.error("Error clearing all notifications:", error);
+    }
+  };
+
+  const getIcon = (type) => {
+    switch (type) {
+      case 'friendRequest': return <UserCheck className="w-8 h-8 text-green-500" />;
+      case 'giftReceived': return <Gift className="w-8 h-8 text-yellow-500" />;
+      case 'roomInvite': return <Users className="w-8 h-8 text-blue-500" />;
+      default: return <Gift className="w-8 h-8 text-gray-500" />;
+    }
+  }
+
   return (
     <div className={`absolute top-0 right-0 h-full w-full md:w-96 bg-gray-950/90 backdrop-blur-md p-6 flex flex-col border-l border-gray-800 transition-transform duration-500 ease-in-out transform z-50`}>
       <div className="flex justify-between items-center pb-4 border-b border-gray-800">
@@ -11,7 +50,7 @@ const NotificationPanel = ({ notifications, onClear, onToggle }) => {
           <X className="w-6 h-6 text-white" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto my-4 space-y-4">
+      <div className="flex-1 overflow-y-auto my-4 space-y-4 custom-scrollbar">
         {notifications.length > 0 ? (
           <TransitionGroup>
             {notifications.map((notification) => (
@@ -20,20 +59,21 @@ const NotificationPanel = ({ notifications, onClear, onToggle }) => {
                 timeout={300}
                 classNames="notification-item"
               >
-                <div className="flex items-center space-x-4 p-4 rounded-xl bg-gray-900 shadow-lg border border-gray-800 transform hover:scale-105 transition-all duration-300">
+                <div className={`relative flex items-center space-x-4 p-4 rounded-xl bg-gray-900 shadow-lg border border-gray-800 transform hover:scale-105 transition-all duration-300 ${!notification.read ? 'border-blue-500' : 'border-gray-800'}`}>
+                  {!notification.read && <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-blue-500 rounded-full"></div>}
                   <div className="flex-shrink-0">
-                    {notification.type === 'friendRequest' && <UserCheck className="w-8 h-8 text-green-500" />}
-                    {notification.type === 'giftReceived' && <Gift className="w-8 h-8 text-yellow-500" />}
-                    {notification.type === 'roomInvite' && <Users className="w-8 h-8 text-blue-500" />}
+                    {getIcon(notification.type)}
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-white">{notification.user}</p>
+                    <p className="font-bold text-white">{notification.user || 'نظام'}</p>
                     <p className="text-sm text-gray-400">{notification.message}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
-                      <CheckCircle className="w-5 h-5 text-white" />
-                    </button>
+                    {!notification.read && (
+                      <button onClick={() => handleMarkAsRead(notification.id)} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </CSSTransition>
@@ -46,8 +86,9 @@ const NotificationPanel = ({ notifications, onClear, onToggle }) => {
         )}
       </div>
       {notifications.length > 0 && (
-        <button onClick={onClear} className="w-full mt-4 p-3 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition-colors duration-200 shadow-md transform hover:scale-105">
-          مسح الكل
+        <button onClick={handleClearAll} className="w-full mt-4 p-3 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition-colors duration-200 shadow-md transform hover:scale-105 flex items-center justify-center space-x-2">
+          <Trash2 className="w-5 h-5"/>
+          <span>مسح الكل</span>
         </button>
       )}
     </div>

@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft, Plus, Lock, Zap } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 
-const MainDashboard = ({ onJoinRoom, onBack, onCreateRoom }) => {
+const MainDashboard = () => {
   const { user, db, appId } = useAuth();
+  const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
 
   useEffect(() => {
     if (!db) return;
+    // In a real app, you might want to order by activity or number of users
     const roomsCollectionRef = collection(db, `/artifacts/${appId}/public/data/rooms`);
     const q = query(roomsCollectionRef, orderBy('createdAt', 'desc'));
 
@@ -33,13 +36,13 @@ const MainDashboard = ({ onJoinRoom, onBack, onCreateRoom }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex justify-between items-center p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <div className="flex items-center space-x-2">
           <span className="text-2xl font-extrabold">غرف المحادثة</span>
         </div>
-        <button onClick={onCreateRoom} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+        <button onClick={() => navigate('/create-room')} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
           <Plus className="w-6 h-6 text-white" />
         </button>
       </header>
@@ -65,7 +68,7 @@ const MainDashboard = ({ onJoinRoom, onBack, onCreateRoom }) => {
                 <h2 className="text-xl md:text-2xl font-bold mb-2">{room.title}</h2>
                 <p className="text-sm text-gray-400 mb-4">{room.description}</p>
                 <button
-                  onClick={() => onJoinRoom(room.id, room.roomType)}
+                  onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)}
                   disabled={room.isLocked}
                   className={`w-full py-3 px-6 rounded-full font-bold text-white transition-all duration-300 shadow-lg flex items-center justify-center ${
                     room.isLocked
