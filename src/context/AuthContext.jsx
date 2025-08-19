@@ -5,41 +5,53 @@ import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, add
 
 const AuthContext = createContext();
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
 let app, auth, db;
 const appId = import.meta.env.VITE_APP_ID || 'default-app-id';
 
-const initializeFirebase = () => {
-  if (app) return; // Already initialized
-  try {
-    const firebaseConfigStr = import.meta.env.VITE_FIREBASE_CONFIG;
-    if (!firebaseConfigStr) {
-      console.error("Firebase config not found. Please set VITE_FIREBASE_CONFIG in your .env file.");
-      return;
-    }
-    const firebaseConfig = JSON.parse(firebaseConfigStr);
-    if (Object.keys(firebaseConfig).length > 0) {
-      app = initializeApp(firebaseConfig);
-      auth = getAuth(app);
-      db = getFirestore(app);
-      console.log('Firebase initialized in AuthProvider.');
-    }
-  } catch (error) {
-    console.error("Failed to initialize Firebase:", error);
-  }
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [firebaseError, setFirebaseError] = useState(null);
 
   useEffect(() => {
+    const initializeFirebase = () => {
+      try {
+        if (app) return; // Already initialized
+
+        const firebaseConfigStr = import.meta.env.VITE_FIREBASE_CONFIG;
+        if (!firebaseConfigStr || firebaseConfigStr.trim() === '') {
+          throw new Error("Firebase config (VITE_FIREBASE_CONFIG) is missing or empty in your environment variables.");
+        }
+
+        let firebaseConfig;
+        try {
+          firebaseConfig = JSON.parse(firebaseConfigStr);
+        } catch (e) {
+          console.error("Invalid JSON in VITE_FIREBASE_CONFIG:", e);
+          throw new Error("Failed to parse VITE_FIREBASE_CONFIG. Please ensure it is valid JSON.");
+        }
+
+        if (Object.keys(firebaseConfig).length > 0) {
+          app = initializeApp(firebaseConfig);
+          auth = getAuth(app);
+          db = getFirestore(app);
+          console.log('Firebase initialized in AuthProvider.');
+        } else {
+          throw new Error("Firebase config is an empty object.");
+        }
+      } catch (error) {
+        console.error("Failed to initialize Firebase:", error);
+        setFirebaseError(error.message);
+        setIsLoading(false);
+      }
+    };
+
     initializeFirebase();
     if (!auth) {
-      setIsLoading(false);
+      // If initialization failed, firebaseError will be set, so we can just return.
       return;
     }
 
@@ -49,9 +61,9 @@ export const AuthProvider = ({ children }) => {
       signInWithCustomToken(auth, initialAuthToken).catch(error => {
         console.error("Error signing in with custom token:", error);
         return signInAnonymously(auth);
-      }).catch(e => console.error("Anonymous sign-in failed:", e));
+      }).catch(err => console.error("Anonymous sign-in failed:", err));
     } else {
-      signInAnonymously(auth).catch(e => console.error("Anonymous sign-in failed:", e));
+      signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
     }
 
     const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
@@ -66,7 +78,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && db) { // Ensure db is initialized
       const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
 
       const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
@@ -119,6 +131,19 @@ export const AuthProvider = ({ children }) => {
     logout: () => signOut(auth),
     sendNotification,
   };
+
+  if (firebaseError) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: '#282c34', color: 'white', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <h1 style={{ fontSize: '2rem', color: '#ff6b6b' }}>Application Error</h1>
+        <p style={{ marginTop: '1rem', fontSize: '1.2rem' }}>Could not start the application due to a configuration issue.</p>
+        <pre style={{ marginTop: '1rem', padding: '15px', backgroundColor: '#333', borderRadius: '5px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {firebaseError}
+        </pre>
+        <p style={{ marginTop: '2rem', fontSize: '1rem' }}>Please ensure you have set up your <code>.env</code> file correctly with the required environment variables.</p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
