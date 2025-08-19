@@ -4,8 +4,14 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate, useParams } from 'react-router-dom';
 
-const PrivateChat = ({ onBack, friendId, friendName }) => {
+const PrivateChat = () => {
+  const navigate = useNavigate();
+  const { friendId } = useParams();
+  // We need a way to get the friend's name. This should be passed in state or fetched.
+  // For now, we'll leave it as a placeholder.
+  const friendName = "Friend";
   const { user, db, appId } = useAuth();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -34,7 +40,7 @@ const PrivateChat = ({ onBack, friendId, friendName }) => {
     });
 
     return () => unsubscribe();
-  }, [userId, friendId, db, appId]);
+  }, [user, friendId, db, appId]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -67,7 +73,7 @@ const PrivateChat = ({ onBack, friendId, friendName }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/chats')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">{friendName}</span>

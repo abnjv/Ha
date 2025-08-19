@@ -3,8 +3,10 @@ import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-const AddFriendScreen = ({ onBack }) => {
+const AddFriendScreen = () => {
+  const navigate = useNavigate();
   const { user, db, appId } = useAuth();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friendUserId, setFriendUserId] = useState('');
@@ -70,7 +72,7 @@ const AddFriendScreen = ({ onBack }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">إضافة صديق</span>

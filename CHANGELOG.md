@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Implemented core WebRTC voice chat functionality with a Socket.io signaling server.
 - Implemented real-time participant list in chat rooms using Firestore.
 - Implemented room sorting by last activity on the dashboard.
 - Added error logging to Firestore for the `sendNotification` function.
