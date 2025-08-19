@@ -30,7 +30,7 @@ const PrivateChatList = ({ onBack, onOpenChat }) => {
     });
 
     return () => unsubscribe();
-  }, [userId, db, appId]);
+  }, [user, db, appId]);
 
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>

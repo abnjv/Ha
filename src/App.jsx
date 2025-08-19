@@ -23,7 +23,7 @@ const mockNotifications = [
 ];
 
 const AppContent = () => {
-  const { user, userProfile, logout, db, appId } = useAuth();
+  const { user, logout } = useAuth();
   const { themeClasses } = useContext(ThemeContext);
 
   const [currentPage, setCurrentPage] = useState(user ? 'home' : 'login');

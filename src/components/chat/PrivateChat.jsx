@@ -34,7 +34,7 @@ const PrivateChat = ({ onBack, friendId, friendName }) => {
     });
 
     return () => unsubscribe();
-  }, [userId, friendId, db, appId]);
+  }, [user, friendId, db, appId]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
