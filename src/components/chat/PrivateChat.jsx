@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CornerUpLeft, Send as SendIcon } from 'lucide-react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 
-const PrivateChat = ({ onBack, friendId, friendName }) => {
+const PrivateChat = () => {
   const { user, db, appId } = useAuth();
+  const navigate = useNavigate();
+  const { friendId, friendName } = useParams();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef(null);
@@ -15,7 +18,7 @@ const PrivateChat = ({ onBack, friendId, friendName }) => {
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
 
   useEffect(() => {
-    if (!db || !user?.uid) return;
+    if (!db || !user?.uid || !friendId) return;
 
     const chatPartners = [user.uid, friendId].sort().join('_');
     const privateChatPath = `/artifacts/${appId}/public/data/private_chats/${chatPartners}/messages`;
@@ -44,7 +47,7 @@ const PrivateChat = ({ onBack, friendId, friendName }) => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (inputMessage.trim() === '' || !db || isSendingMessage) return;
+    if (inputMessage.trim() === '' || !db || isSendingMessage || !friendId) return;
 
     setIsSendingMessage(true);
     const chatPartners = [user.uid, friendId].sort().join('_');
@@ -67,7 +70,7 @@ const PrivateChat = ({ onBack, friendId, friendName }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/private-chat-list')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">{friendName}</span>

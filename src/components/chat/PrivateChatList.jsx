@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft, MessageSquare } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 
-const PrivateChatList = ({ onBack, onOpenChat }) => {
+const PrivateChatList = () => {
   const { user, db, appId } = useAuth();
+  const navigate = useNavigate();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +37,7 @@ const PrivateChatList = ({ onBack, onOpenChat }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">الدردشة الخاصة</span>
@@ -58,7 +60,7 @@ const PrivateChatList = ({ onBack, onOpenChat }) => {
                   <span className="font-bold">{friend.name}</span>
                 </div>
                 <button
-                  onClick={() => onOpenChat(friend.id, friend.name)}
+                  onClick={() => navigate(`/chat/${friend.id}/${friend.name}`)}
                   className="py-2 px-4 bg-blue-600 text-white rounded-full font-bold hover:bg-blue-700 transition-colors duration-200"
                 >
                   <MessageSquare className="w-5 h-5 inline-block" />

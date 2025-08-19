@@ -1,11 +1,13 @@
 import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 
-const CreateRoomScreen = ({ onBack, onRoomCreated }) => {
+const CreateRoomScreen = () => {
   const { user, userProfile, db, appId } = useAuth();
+  const navigate = useNavigate();
   const [roomTitle, setRoomTitle] = useState('');
   const [roomDescription, setRoomDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,9 +30,10 @@ const CreateRoomScreen = ({ onBack, onRoomCreated }) => {
         createdAt: serverTimestamp(),
       };
       await addDoc(roomsCollectionRef, newRoom);
-      onRoomCreated();
+      navigate('/dashboard'); // Navigate back to dashboard after creation
     } catch (error) {
       console.error("Error creating new room:", error);
+      // Optionally, show an error message to the user
     } finally {
       setIsLoading(false);
     }
@@ -39,7 +42,7 @@ const CreateRoomScreen = ({ onBack, onRoomCreated }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${themeClasses === 'bg-gray-950 text-white' ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">إنشاء غرفة جديدة</span>

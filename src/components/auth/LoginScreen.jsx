@@ -1,13 +1,25 @@
 import React, { useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 
-const LoginScreen = ({ onLogin }) => {
+const LoginScreen = () => {
   const { themeClasses } = useContext(ThemeContext);
+  const navigate = useNavigate();
+  const { loginWithGoogle } = useAuth();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    onLogin();
+    try {
+      await loginWithGoogle();
+      // The ProtectedRoute in App.jsx will handle the redirect automatically
+      // upon user state change. Navigating here provides a faster UX.
+      navigate('/');
+    } catch (error) {
+      console.error("Failed to login:", error);
+      // TODO: Show an error message to the user
+    }
   };
 
   return (

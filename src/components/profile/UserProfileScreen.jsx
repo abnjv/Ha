@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft, Edit, X, Save, Plus } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, setDoc } from 'firebase/firestore';
@@ -9,8 +10,9 @@ const getLevelFromXP = (xp) => {
 
 import { useAuth } from '../../context/AuthContext';
 
-const UserProfileScreen = ({ onBack }) => {
+const UserProfileScreen = () => {
   const { user, userProfile, db, appId } = useAuth();
+  const navigate = useNavigate();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [isEditing, setIsEditing] = useState(false);
   const [newUserName, setNewUserName] = useState(userProfile?.name || '');
@@ -47,7 +49,7 @@ const UserProfileScreen = ({ onBack }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">الملف الشخصي</span>

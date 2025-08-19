@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft, UserPlus, UserMinus } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 
-const FriendList = ({ onBack, onAddFriend }) => {
+const FriendList = () => {
   const { user, db, appId } = useAuth();
+  const navigate = useNavigate();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,11 +52,11 @@ const FriendList = ({ onBack, onAddFriend }) => {
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
+        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">قائمة الأصدقاء</span>
-        <button onClick={onAddFriend} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+        <button onClick={() => navigate('/add-friend')} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
           <UserPlus className="w-6 h-6 text-white" />
         </button>
       </header>
