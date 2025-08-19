@@ -26,7 +26,8 @@ const VoiceChatRoom = () => {
 
   useEffect(() => {
     // 1. Connect to the signaling server
-    socketRef.current = io('http://localhost:3001');
+    const signalingServerUrl = import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001';
+    socketRef.current = io(signalingServerUrl);
     const socket = socketRef.current;
 
     // Announce our arrival
