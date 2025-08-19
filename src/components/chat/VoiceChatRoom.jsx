@@ -3,10 +3,9 @@ import * as THREE from 'three';
 import { Mic, MicOff, MessageSquare, CornerUpLeft, PhoneCall, PhoneMissed, Send, MoreHorizontal, Gift, X } from 'lucide-react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 import { useAuth } from '../../context/AuthContext';
-import { deleteDoc } from 'firebase/firestore';
 
 const getCategorizedUsers = (users) => {
   const speakers = users.filter(user => user.onStage);
