@@ -2,7 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { CSSTransition } from 'react-transition-group';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ThemeProvider, ThemeContext } from './context/ThemeProvider';
+import { ThemeProvider } from './context/ThemeProvider';
+import { ThemeContext } from './context/ThemeContext';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 // Component Imports
