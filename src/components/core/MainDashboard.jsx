@@ -4,6 +4,7 @@ import { CornerUpLeft, Plus, Lock, Zap } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { getRoomsPath } from '../../constants';
 
 const MainDashboard = () => {
   const { user, db, appId } = useAuth();
@@ -15,7 +16,7 @@ const MainDashboard = () => {
   useEffect(() => {
     if (!db) return;
     // In a real app, you might want to order by activity or number of users
-    const roomsCollectionRef = collection(db, `/artifacts/${appId}/public/data/rooms`);
+    const roomsCollectionRef = collection(db, getRoomsPath(appId));
     const q = query(roomsCollectionRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {

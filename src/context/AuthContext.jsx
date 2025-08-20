@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { getUserProfilePath, getUserNotificationsPath } from '../constants';
 
 const AuthContext = createContext();
 
@@ -79,7 +80,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (user && db) { // Ensure db is initialized
-      const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
+      const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
 
       const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
         if (docSnap.exists()) {
@@ -107,7 +108,7 @@ export const AuthProvider = ({ children }) => {
 
   const sendNotification = async (targetUserId, type, message) => {
     if (!db || !userProfile) return;
-    const notificationsPath = `/artifacts/${appId}/users/${targetUserId}/notifications`;
+    const notificationsPath = getUserNotificationsPath(appId, targetUserId);
     try {
       await addDoc(collection(db, notificationsPath), {
         type,

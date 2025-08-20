@@ -1,40 +1,31 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import react from 'eslint-plugin-react'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import globals from 'globals';
+import react from 'eslint-plugin-react';
+import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'node_modules']),
   {
     files: ['**/*.{js,jsx}'],
     ignores: ['signaling-server.js'],
     plugins: {
       react,
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
     },
-    // I am temporarily removing all extends to isolate the issue.
-    extends: [
-      js.configs.recommended,
-    ],
     languageOptions: {
-      ecmaVersion: 2020,
       globals: {
         ...globals.browser,
       },
       parserOptions: {
-        ecmaVersion: 'latest',
-        ecmaFeatures: { jsx: true },
-        sourceType: 'module',
+        ecmaFeatures: {
+          jsx: true,
+        },
       },
     },
     rules: {
-      'react/prop-types': 'off',
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'react/jsx-uses-react': 'error',
+      'react/jsx-uses-vars': 'error',
+      'no-unused-vars': 'warn',
     },
-    settings: {
+     settings: {
         react: {
             version: 'detect'
         }
@@ -45,10 +36,7 @@ export default defineConfig([
     languageOptions: {
       globals: {
         ...globals.node,
-      }
+      },
     },
-    rules: {
-      'no-undef': 'error',
-    }
-  }
-])
+  },
+]);

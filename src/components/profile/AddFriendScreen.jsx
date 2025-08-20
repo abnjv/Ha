@@ -4,6 +4,7 @@ import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { getUserProfilePath, getUserFriendsPath } from '../../constants';
 
 const AddFriendScreen = () => {
   const { user, db, appId } = useAuth();
@@ -28,7 +29,7 @@ const AddFriendScreen = () => {
 
     try {
       // Check if friend exists (optional but good practice)
-      const friendProfileRef = doc(db, `/artifacts/${appId}/users/${friendUserId}/profile`, 'data');
+      const friendProfileRef = doc(db, getUserProfilePath(appId, friendUserId));
       const docSnap = await getDoc(friendProfileRef);
 
       if (!docSnap.exists()) {
@@ -38,7 +39,7 @@ const AddFriendScreen = () => {
       }
 
       // Add to current user's friend list
-      const userFriendDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/friends`, friendUserId);
+      const userFriendDocRef = doc(db, getUserFriendsPath(appId, user.uid), friendUserId);
       await setDoc(userFriendDocRef, {
         name: docSnap.data().name || 'مجهول',
         avatar: docSnap.data().avatar || `https://placehold.co/48x48/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${(docSnap.data().name || 'م').charAt(0)}`,
@@ -46,9 +47,9 @@ const AddFriendScreen = () => {
       });
 
       // Add current user to friend's friend list
-      const friendFriendDocRef = doc(db, `/artifacts/${appId}/users/${friendUserId}/friends`, user.uid);
+      const friendFriendDocRef = doc(db, getUserFriendsPath(appId, friendUserId), user.uid);
       // You should fetch the current user's profile to add their name/avatar
-      const userProfileRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
+      const userProfileRef = doc(db, getUserProfilePath(appId, user.uid));
       const userProfileSnap = await getDoc(userProfileRef);
       if (userProfileSnap.exists()) {
         await setDoc(friendFriendDocRef, {

@@ -4,6 +4,7 @@ import { CornerUpLeft, MessageSquare } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { getUserFriendsPath } from '../../constants';
 
 const PrivateChatList = () => {
   const { user, db, appId } = useAuth();
@@ -15,8 +16,8 @@ const PrivateChatList = () => {
   useEffect(() => {
     if (!db || !user?.uid) return;
 
-    const privateDataPath = `/artifacts/${appId}/users/${user.uid}/friends`;
-    const friendsCollectionRef = collection(db, privateDataPath);
+    const friendsPath = getUserFriendsPath(appId, user.uid);
+    const friendsCollectionRef = collection(db, friendsPath);
     const q = query(friendsCollectionRef);
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {

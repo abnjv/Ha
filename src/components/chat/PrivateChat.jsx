@@ -5,6 +5,7 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { getPrivateChatMessagesPath } from '../../constants';
 
 const PrivateChat = () => {
   const { user, db, appId } = useAuth();
@@ -21,7 +22,7 @@ const PrivateChat = () => {
     if (!db || !user?.uid || !friendId) return;
 
     const chatPartners = [user.uid, friendId].sort().join('_');
-    const privateChatPath = `/artifacts/${appId}/public/data/private_chats/${chatPartners}/messages`;
+    const privateChatPath = getPrivateChatMessagesPath(appId, chatPartners);
     const q = query(collection(db, privateChatPath), orderBy('createdAt'));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -51,7 +52,7 @@ const PrivateChat = () => {
 
     setIsSendingMessage(true);
     const chatPartners = [user.uid, friendId].sort().join('_');
-    const privateChatPath = `/artifacts/${appId}/public/data/private_chats/${chatPartners}/messages`;
+    const privateChatPath = getPrivateChatMessagesPath(appId, chatPartners);
 
     try {
       await addDoc(collection(db, privateChatPath), {

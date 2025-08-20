@@ -3,13 +3,14 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { X, UserCheck, Gift, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { getUserNotificationsPath } from '../../constants';
 
 const NotificationPanel = ({ notifications, onToggle }) => {
   const { user, db, appId } = useAuth();
 
   const handleMarkAsRead = async (notificationId) => {
     if (!user || !db) return;
-    const notifRef = doc(db, `/artifacts/${appId}/users/${user.uid}/notifications`, notificationId);
+    const notifRef = doc(db, getUserNotificationsPath(appId, user.uid), notificationId);
     try {
       await updateDoc(notifRef, { read: true });
     } catch (error) {
@@ -22,7 +23,7 @@ const NotificationPanel = ({ notifications, onToggle }) => {
 
     const batch = writeBatch(db);
     notifications.forEach(notification => {
-      const notifRef = doc(db, `/artifacts/${appId}/users/${user.uid}/notifications`, notification.id);
+      const notifRef = doc(db, getUserNotificationsPath(appId, user.uid), notification.id);
       batch.delete(notifRef);
     });
 

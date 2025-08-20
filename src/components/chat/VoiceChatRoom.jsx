@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { Mic, MicOff, PhoneCall, PhoneMissed } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { collection, query, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { getVoiceRoomParticipantsPath } from '../../constants';
 
 const ICE_SERVERS = {
   iceServers: [
@@ -12,7 +14,7 @@ const ICE_SERVERS = {
 };
 
 const VoiceChatRoom = () => {
-  const { user } = useAuth();
+  const { user, userProfile, db, appId } = useAuth();
   const navigate = useNavigate();
   const { roomId } = useParams();
 
@@ -20,92 +22,104 @@ const VoiceChatRoom = () => {
   const peerConnectionsRef = useRef({});
   const localStreamRef = useRef(null);
   const audioContainerRef = useRef(null);
+  const audioIntervalsRef = useRef({});
 
+  const [participants, setParticipants] = useState([]);
+  const [uidSocketMap, setUidSocketMap] = useState({});
+  const [speakingState, setSpeakingState] = useState({});
   const [isMuted, setIsMuted] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
 
+  // Effect for fetching participants from Firestore
   useEffect(() => {
-    // 1. Connect to the signaling server
-    const signalingServerUrl = import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001';
-    socketRef.current = io(signalingServerUrl);
-    const socket = socketRef.current;
+    if (!db || !roomId) return;
+    const participantsColRef = collection(db, getVoiceRoomParticipantsPath(appId, roomId));
+    const q = query(participantsColRef);
 
-    // Announce our arrival
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedParticipants = [];
+      snapshot.forEach((doc) => {
+        fetchedParticipants.push({ id: doc.id, ...doc.data() });
+      });
+      setParticipants(fetchedParticipants);
+    });
+    return unsubscribe;
+  }, [db, roomId, appId]);
+
+  // Main WebRTC connection effect
+  useEffect(() => {
+    const socket = io(import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001');
+    socketRef.current = socket;
+
     socket.emit('join-room', roomId, user.uid);
 
-    // 2. Handle new user joining the room
     socket.on('user-joined', (newUserId, newSocketId) => {
       console.log(`New user joined: ${newUserId}, creating offer...`);
       createPeerConnection(newSocketId, true);
     });
 
-    // 3. Handle receiving an offer
+    // Listen for the complete room state from the server
+    socket.on('room-state', (roomState) => {
+      console.log('Received room state:', roomState);
+      setUidSocketMap(roomState);
+    });
+
     socket.on('webrtc-offer', async ({ senderSocketId, sdp }) => {
       console.log(`Received offer from ${senderSocketId}`);
       const pc = createPeerConnection(senderSocketId, false);
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-
-      socket.emit('webrtc-answer', {
-        targetSocketId: senderSocketId,
-        sdp: pc.localDescription,
-      });
+      socket.emit('webrtc-answer', { targetSocketId: senderSocketId, sdp: pc.localDescription });
     });
 
-    // 4. Handle receiving an answer
     socket.on('webrtc-answer', async ({ senderSocketId, sdp }) => {
       console.log(`Received answer from ${senderSocketId}`);
       const pc = peerConnectionsRef.current[senderSocketId];
-      if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      }
+      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(sdp));
     });
 
-    // 5. Handle receiving an ICE candidate
     socket.on('webrtc-ice-candidate', ({ senderSocketId, candidate }) => {
-      console.log(`Received ICE candidate from ${senderSocketId}`);
       const pc = peerConnectionsRef.current[senderSocketId];
-      if (pc && candidate) {
-        pc.addIceCandidate(new RTCIceCandidate(candidate));
-      }
+      if (pc && candidate) pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
-    // 6. Handle user leaving
     socket.on('user-left', (socketId) => {
       console.log(`User with socket ID ${socketId} left.`);
       if (peerConnectionsRef.current[socketId]) {
         peerConnectionsRef.current[socketId].close();
         delete peerConnectionsRef.current[socketId];
       }
-      const audioEl = document.getElementById(socketId);
-      if (audioEl) {
-        audioEl.remove();
+      if (audioIntervalsRef.current[socketId]) {
+        clearInterval(audioIntervalsRef.current[socketId]);
+        delete audioIntervalsRef.current[socketId];
       }
+      setSpeakingState(prev => {
+        const newState = { ...prev };
+        delete newState[socketId];
+        return newState;
+      });
+      const audioEl = document.getElementById(socketId);
+      if (audioEl) audioEl.remove();
     });
 
-    // Cleanup on component unmount
     return () => {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
+      Object.values(audioIntervalsRef.current).forEach(interval => clearInterval(interval));
       socket.disconnect();
     };
   }, [roomId, user.uid]);
 
   const createPeerConnection = (targetSocketId, isOfferor) => {
     const pc = new RTCPeerConnection(ICE_SERVERS);
+    peerConnectionsRef.current[targetSocketId] = pc;
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current.emit('webrtc-ice-candidate', {
-          targetSocketId,
-          candidate: event.candidate,
-        });
-      }
-    };
+    localStreamRef.current?.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
+
+    pc.onicecandidate = e => e.candidate && socketRef.current.emit('webrtc-ice-candidate', { targetSocketId, candidate: e.candidate });
 
     pc.ontrack = (event) => {
       const remoteStream = event.streams[0];
@@ -114,30 +128,34 @@ const VoiceChatRoom = () => {
         audioEl = document.createElement('audio');
         audioEl.id = targetSocketId;
         audioEl.autoplay = true;
-        audioContainerRef.current.appendChild(audioEl);
+        if(audioContainerRef.current) {
+          audioContainerRef.current.appendChild(audioEl);
+        }
       }
       audioEl.srcObject = remoteStream;
+
+      // --- Speaking Indicator Logic ---
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(remoteStream);
+      source.connect(analyser);
+      analyser.fftSize = 512;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      audioIntervalsRef.current[targetSocketId] = setInterval(() => {
+        analyser.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+        const isSpeaking = average > 20; // Threshold can be adjusted
+        setSpeakingState(prev => ({ ...prev, [targetSocketId]: isSpeaking }));
+      }, 200);
     };
-
-    if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => {
-            pc.addTrack(track, localStreamRef.current);
-        });
-    }
-
-    peerConnectionsRef.current[targetSocketId] = pc;
 
     if (isOfferor) {
       pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
-        .then(() => {
-          socketRef.current.emit('webrtc-offer', {
-            targetSocketId,
-            sdp: pc.localDescription,
-          });
-        });
+        .then(() => socketRef.current.emit('webrtc-offer', { targetSocketId, sdp: pc.localDescription }));
     }
-
     return pc;
   };
 
@@ -146,24 +164,26 @@ const VoiceChatRoom = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
       setIsJoined(true);
-      // At this point, new users who join will get our stream.
-      // We could also re-initiate connections to existing users if needed.
+      // Add self to Firestore participants
+      const participantRef = doc(db, getVoiceRoomParticipantsPath(appId, roomId), user.uid);
+      await setDoc(participantRef, { name: userProfile.name, avatar: userProfile.avatar, uid: user.uid, joinedAt: serverTimestamp() });
     } catch (error) {
       console.error("Error accessing microphone:", error);
     }
   };
 
-  const endVoiceChat = () => {
+  const endVoiceChat = async () => {
+    // Remove self from Firestore participants
+    const participantRef = doc(db, getVoiceRoomParticipantsPath(appId, roomId), user.uid);
+    await deleteDoc(participantRef);
+
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
     }
     localStreamRef.current = null;
 
-    Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
-    peerConnectionsRef.current = {};
-
     setIsJoined(false);
-    socketRef.current.disconnect();
+    socketRef.current.disconnect(); // This will trigger cleanup effect
     navigate('/dashboard');
   };
 
@@ -175,10 +195,32 @@ const VoiceChatRoom = () => {
     }
   };
 
+  // Find the socket ID for a given participant UID
+  const findSocketIdByUid = (uid) => {
+    return uidSocketMap[uid] || null;
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 text-white p-4">
-      <h1 className="text-2xl font-bold mb-4">Voice Chat Room: {roomId}</h1>
-      <div className="flex justify-center my-6 space-x-6">
+      <header className="flex justify-between items-center p-4">
+        <h1 className="text-2xl font-bold">Voice Chat Room: {roomId}</h1>
+        <button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600">Back</button>
+      </header>
+
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 p-4">
+        {participants.map(p => {
+          const socketId = findSocketIdByUid(p.id);
+          const isSpeaking = socketId ? speakingState[socketId] : false;
+          return (
+            <div key={p.id} className={`flex flex-col items-center p-4 rounded-lg transition-all duration-200 ${isSpeaking ? 'border-2 border-green-400 scale-110' : 'border-2 border-transparent'}`}>
+              <img src={p.avatar} alt={p.name} className="w-20 h-20 rounded-full mb-2" />
+              <p className="font-semibold text-center">{p.name}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-center my-6 space-x-6 fixed bottom-4 left-1/2 -translate-x-1/2">
         <button
           onClick={isJoined ? endVoiceChat : startVoiceChat}
           className={`p-4 rounded-full text-white shadow-lg ${isJoined ? 'bg-red-600' : 'bg-green-600'}`}
@@ -194,9 +236,7 @@ const VoiceChatRoom = () => {
           </button>
         )}
       </div>
-      <div ref={audioContainerRef}>
-        {/* Remote audio streams will be appended here */}
-      </div>
+      <div ref={audioContainerRef} />
     </div>
   );
 };
