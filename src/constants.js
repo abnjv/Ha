@@ -19,6 +19,8 @@ export const getPrivateChatsPath = (appId, chatPartnersId) => `${getPublicDataPa
 
 export const getPrivateChatMessagesPath = (appId, chatPartnersId) => `${getPrivateChatsPath(appId, chatPartnersId)}/messages`;
 
+export const getFriendRequestsPath = (appId) => `${getPublicDataPath(appId)}/friend_requests`;
+
 
 // --- User-Specific Data Paths ---
 const getUsersPath = (appId) => `${getArtifactsPath(appId)}/users`;

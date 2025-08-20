@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft, Edit, X, Save, Plus } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, setDoc } from 'firebase/firestore';
+import { getUserProfilePath } from '../../constants';
 
 const getLevelFromXP = (xp) => {
   return Math.floor(Math.sqrt(xp / 100)) + 1;
@@ -16,11 +17,13 @@ const UserProfileScreen = () => {
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [isEditing, setIsEditing] = useState(false);
   const [newUserName, setNewUserName] = useState(userProfile?.name || '');
+  const [newUserBio, setNewUserBio] = useState(userProfile?.bio || '');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
       setNewUserName(userProfile.name);
+      setNewUserBio(userProfile.bio || '');
     }
   }, [userProfile]);
 
@@ -29,10 +32,10 @@ const UserProfileScreen = () => {
 
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/profile`, 'data');
-      // The onSnapshot listener in AuthContext will handle the local state update automatically
+      const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
       await setDoc(userDocRef, {
         name: newUserName,
+        bio: newUserBio,
       }, { merge: true });
       setIsEditing(false);
     } catch (error) {
@@ -76,10 +79,35 @@ const UserProfileScreen = () => {
           ) : (
             <h2 className="text-3xl font-bold mb-2">{userProfile?.name || 'مستخدم جديد'}</h2>
           )}
-          <p className="text-sm text-gray-400 mb-4 break-all">ID: {user?.uid}</p>
+          <p className="text-sm text-gray-400 mb-1 break-all">ID: {user?.uid}</p>
+
+          <div className="flex items-center justify-center space-x-2 rtl:space-x-reverse mb-4">
+            <span className={`h-3 w-3 rounded-full ${userProfile?.status === 'online' ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></span>
+            <p className="text-sm text-gray-400">
+              {userProfile?.status === 'online'
+                ? 'متصل'
+                : `غير متصل ${userProfile?.lastSeen ? `- آخر ظهور ${new Date(userProfile.lastSeen.toDate()).toLocaleString()}` : ''}`
+              }
+            </p>
+          </div>
+
+          <div className="mt-4 text-left">
+            <h3 className="text-lg font-bold mb-2 border-b border-gray-700 pb-1">نبذة تعريفية</h3>
+            {isEditing ? (
+              <textarea
+                value={newUserBio}
+                onChange={(e) => setNewUserBio(e.target.value)}
+                className="w-full text-sm bg-gray-700 text-white rounded-xl py-2 px-4 focus:outline-none"
+                rows="3"
+                placeholder="Tell us about yourself..."
+              />
+            ) : (
+              <p className="text-sm text-gray-400 italic">{userProfile?.bio || 'No bio yet.'}</p>
+            )}
+          </div>
 
           {isEditing && (
-            <button onClick={handleSaveProfile} disabled={isLoading} className="mt-4 py-2 px-6 bg-green-600 text-white rounded-full font-bold hover:bg-green-700 transition-colors duration-200 disabled:bg-gray-700">
+            <button onClick={handleSaveProfile} disabled={isLoading} className="mt-6 py-2 px-6 bg-green-600 text-white rounded-full font-bold hover:bg-green-700 transition-colors duration-200 disabled:bg-gray-700">
               {isLoading ? 'جارٍ الحفظ...' : <Save className="w-5 h-5" />}
             </button>
           )}
