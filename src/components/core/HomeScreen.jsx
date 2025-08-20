@@ -1,18 +1,44 @@
-import React, { useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, MessageSquare, User as UserIcon, Home, Bell, Moon, Sun } from 'lucide-react';
+import { LogOut, Users, User as UserIcon, Home, Bell, Sun } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { getRoomsPath, getUserFriendsPath } from '../../constants';
 
 const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   const { isDarkMode, toggleDarkMode, themeClasses } = useContext(ThemeContext);
-  const { user, logout } = useAuth();
+  const { user, logout, db, appId } = useAuth();
   const navigate = useNavigate();
+
+  const [rooms, setRooms] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch a few public rooms
+  useEffect(() => {
+    if (!db) return;
+    const roomsQuery = query(collection(db, getRoomsPath(appId)), orderBy('createdAt', 'desc'), limit(5));
+    const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot) => {
+      setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoading(false);
+    });
+    return () => unsubscribeRooms();
+  }, [db, appId]);
+
+  // Fetch friends for recent chats
+  useEffect(() => {
+    if (!db || !user?.uid) return;
+    const friendsQuery = query(collection(db, getUserFriendsPath(appId, user.uid)), limit(10));
+    const unsubscribeFriends = onSnapshot(friendsQuery, (snapshot) => {
+      setFriends(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribeFriends();
+  }, [db, appId, user]);
 
   const handleLogout = async () => {
     try {
       await logout();
-      // The ProtectedRoute will handle redirecting to /login
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -22,63 +48,54 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex justify-between items-center p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="flex items-center space-x-2">
-          <div className="p-2 bg-blue-600 rounded-full">
-            <Home className="w-6 h-6 text-white" />
-          </div>
+          <div className="p-2 bg-blue-600 rounded-full"><Home className="w-6 h-6 text-white" /></div>
           <span className="text-2xl font-extrabold">AirChat</span>
         </div>
         <div className="flex items-center space-x-4">
-          <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
-            {isDarkMode ? <Sun className="w-6 h-6 text-yellow-500" /> : <Moon className="w-6 h-6 text-gray-600" />}
-          </button>
-          <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200" title="ملفي الشخصي">
-            <UserIcon className="w-6 h-6 text-blue-500" />
-          </button>
-          <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200" title="أصدقائي">
-            <Users className="w-6 h-6 text-pink-500" />
-          </button>
-          <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 transition-colors duration-200 relative">
+          <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-gray-700"><Sun className="w-6 h-6 text-yellow-500" /></button>
+          <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
+          <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
+          <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative">
             <Bell className="w-6 h-6 text-white" />
             {hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}
           </button>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700 transition-colors duration-200"
-          >
-            <LogOut className="w-4 h-4 inline-block ml-1" />
-            تسجيل الخروج
-          </button>
+          <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ml-1" /> Logout</button>
         </div>
       </header>
 
-      <div className="flex-1 p-8 flex flex-col items-center justify-center text-center">
-        <div className={`p-8 rounded-3xl shadow-2xl max-w-2xl w-full ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-          <h1 className="text-3xl md:text-4xl font-bold mb-6">مرحباً في AirChat!</h1>
-          {user?.uid && (
-            <p className="text-sm text-center text-gray-400 mb-8">
-              User ID: <span className="font-mono break-all">{user.uid}</span>
-            </p>
+      <main className="flex-1 p-4 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-2">
+          <h2 className="text-2xl font-bold mb-4">Public Rooms</h2>
+          {isLoading ? <p>Loading rooms...</p> : (
+            <div className="space-y-4">
+              {rooms.map(room => (
+                <div key={room.id} onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                  <div>
+                    <h3 className="font-bold">{room.title}</h3>
+                    <p className="text-sm text-gray-400">{room.description}</p>
+                  </div>
+                  <button className="p-2 rounded-full bg-green-600 text-white">Join</button>
+                </div>
+              ))}
+              <button onClick={() => navigate('/dashboard')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">Browse All Rooms...</button>
+            </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105 hover:shadow-xl shadow-lg"
-            >
-              <Users className="w-10 h-10 mb-2" />
-              <span className="text-xl font-bold">غرف المحادثة</span>
-              <p className="text-sm text-blue-200 mt-1">انضم إلى غرف الدردشة الصوتية</p>
-            </button>
-            <button
-              onClick={() => navigate('/private-chat-list')}
-              className="p-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl flex flex-col items-center justify-center transition-all duration-300 transform hover:scale-105 hover:shadow-xl shadow-lg"
-            >
-              <MessageSquare className="w-10 h-10 mb-2" />
-              <span className="text-xl font-bold">الدردشة الخاصة</span>
-              <p className="text-sm text-purple-200 mt-1">تحدث مع أصدقائك مباشرة</p>
-            </button>
-          </div>
         </div>
-      </div>
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Recent Chats</h2>
+          {isLoading ? <p>Loading...</p> : (
+            <div className="space-y-3">
+              {friends.map(friend => (
+                <div key={friend.id} onClick={() => navigate(`/chat/${friend.id}/${friend.name}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                  <img src={friend.avatar} alt={friend.name} className="w-10 h-10 rounded-full" />
+                  <span className="font-semibold">{friend.name}</span>
+                </div>
+              ))}
+              <button onClick={() => navigate('/private-chat-list')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">All Chats...</button>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
