@@ -2,19 +2,19 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
-import { getUserProfilePath, getUserFriendsPath } from '../../constants';
+import { getUserProfilePath, getUserFriendsPath, getFriendRequestsPath } from '../../constants';
 
 const AddFriendScreen = () => {
-  const { user, db, appId } = useAuth();
+  const { user, userProfile, db, appId } = useAuth();
   const navigate = useNavigate();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friendUserId, setFriendUserId] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleAddFriend = async (e) => {
+  const handleSendFriendRequest = async (e) => {
     e.preventDefault();
     if (!friendUserId.trim() || !db || isLoading) return;
 
@@ -22,13 +22,35 @@ const AddFriendScreen = () => {
     setMessage('');
 
     if (friendUserId === user.uid) {
-      setMessage('لا يمكنك إضافة نفسك كصديق.');
+      setMessage('لا يمكنك إرسال طلب صداقة لنفسك.');
       setIsLoading(false);
       return;
     }
 
     try {
-      // Check if friend exists (optional but good practice)
+      // 1. Check if they are already friends
+      const friendDocRef = doc(db, getUserFriendsPath(appId, user.uid), friendUserId);
+      const friendDocSnap = await getDoc(friendDocRef);
+      if (friendDocSnap.exists()) {
+        setMessage('أنتما صديقان بالفعل.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Check if a request already exists
+      const requestsRef = collection(db, getFriendRequestsPath(appId));
+      const q1 = query(requestsRef, where('from', '==', user.uid), where('to', '==', friendUserId));
+      const q2 = query(requestsRef, where('from', '==', friendUserId), where('to', '==', user.uid));
+
+      const [query1Snapshot, query2Snapshot] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+      if (!query1Snapshot.empty || !query2Snapshot.empty) {
+        setMessage('يوجد طلب صداقة معلق بالفعل مع هذا المستخدم.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. Check if the target user exists
       const friendProfileRef = doc(db, getUserProfilePath(appId, friendUserId));
       const docSnap = await getDoc(friendProfileRef);
 
@@ -38,33 +60,21 @@ const AddFriendScreen = () => {
         return;
       }
 
-      // Add to current user's friend list
-      const userFriendDocRef = doc(db, getUserFriendsPath(appId, user.uid), friendUserId);
-      await setDoc(userFriendDocRef, {
-        name: docSnap.data().name || 'مجهول',
-        avatar: docSnap.data().avatar || `https://placehold.co/48x48/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${(docSnap.data().name || 'م').charAt(0)}`,
-        addedAt: serverTimestamp(),
+      // 4. Create the friend request
+      await addDoc(requestsRef, {
+        from: user.uid,
+        to: friendUserId,
+        fromName: userProfile?.name || 'مستخدم جديد',
+        fromAvatar: userProfile?.avatar || `https://placehold.co/48x48/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${(userProfile?.name || 'م').charAt(0)}`,
+        status: 'pending',
+        createdAt: serverTimestamp(),
       });
 
-      // Add current user to friend's friend list
-      const friendFriendDocRef = doc(db, getUserFriendsPath(appId, friendUserId), user.uid);
-      // You should fetch the current user's profile to add their name/avatar
-      const userProfileRef = doc(db, getUserProfilePath(appId, user.uid));
-      const userProfileSnap = await getDoc(userProfileRef);
-      if (userProfileSnap.exists()) {
-        await setDoc(friendFriendDocRef, {
-          name: userProfileSnap.data().name || 'مجهول',
-          avatar: userProfileSnap.data().avatar || `https://placehold.co/48x48/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${(userProfileSnap.data().name || 'م').charAt(0)}`,
-          addedAt: serverTimestamp(),
-        });
-      }
-
-
-      setMessage('تمت إضافة الصديق بنجاح!');
+      setMessage('تم إرسال طلب الصداقة بنجاح!');
       setFriendUserId('');
     } catch (error) {
-      console.error("Error adding friend:", error);
-      setMessage('حدث خطأ أثناء إضافة الصديق.');
+      console.error("Error sending friend request:", error);
+      setMessage('حدث خطأ أثناء إرسال الطلب.');
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +91,7 @@ const AddFriendScreen = () => {
 
       <div className="flex-1 p-8 flex flex-col items-center justify-center">
         <div className={`w-full max-w-lg p-8 rounded-3xl shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-          <form onSubmit={handleAddFriend} className="space-y-6">
+          <form onSubmit={handleSendFriendRequest} className="space-y-6">
             <div>
               <label htmlFor="friendUserId" className="block text-sm font-medium text-gray-300 mb-2">معرف المستخدم (User ID)</label>
               <input
@@ -96,9 +106,9 @@ const AddFriendScreen = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-6 bg-green-600 text-white font-bold rounded-xl shadow-lg hover:bg-green-700 transition duration-300 transform hover:scale-105 disabled:bg-gray-700 disabled:cursor-not-allowed"
+              className="w-full py-3 px-6 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 disabled:bg-gray-700 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'جارٍ الإضافة...' : 'إضافة صديق'}
+              {isLoading ? 'جارٍ الإرسال...' : 'إرسال طلب صداقة'}
             </button>
           </form>
           {message && (

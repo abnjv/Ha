@@ -7,6 +7,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, u
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../../context/AuthContext';
 import { getPrivateChatMessagesPath, getPrivateChatsPath } from '../../constants';
+import ProfileModal from '../profile/ProfileModal';
 
 const debounce = (func, delay) => { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func(...args), delay); }; };
 
@@ -18,6 +19,7 @@ const PrivateChat = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(null); // To store file being uploaded
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -73,7 +75,7 @@ const PrivateChat = () => {
 
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
-      <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}><button onClick={() => navigate('/private-chat-list')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft/></button><span className="text-2xl font-extrabold flex-1">{friendName}</span></header>
+      <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}><button onClick={() => navigate('/private-chat-list')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft/></button><button onClick={() => setIsProfileModalOpen(true)} className="text-2xl font-extrabold flex-1 text-left hover:underline">{friendName}</button></header>
       <div className={`flex-1 flex flex-col p-4 rounded-3xl shadow-xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="flex-1 overflow-y-auto mb-4 p-4 space-y-4 custom-scrollbar">
           {isLoading ? <div className="flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-dashed rounded-full animate-spin border-blue-500"></div></div> : (
@@ -92,6 +94,7 @@ const PrivateChat = () => {
             </form>
         </div>
       </div>
+      {isProfileModalOpen && <ProfileModal userId={friendId} onClose={() => setIsProfileModalOpen(false)} />}
     </div>
   );
 };

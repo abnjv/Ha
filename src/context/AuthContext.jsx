@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getUserProfilePath, getUserNotificationsPath } from '../constants';
 
@@ -21,13 +21,11 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initializeFirebase = () => {
       try {
-        if (app) return; // Already initialized
-
+        if (app) return;
         const firebaseConfigStr = import.meta.env.VITE_FIREBASE_CONFIG;
         if (!firebaseConfigStr || firebaseConfigStr.trim() === '') {
           throw new Error("Firebase config (VITE_FIREBASE_CONFIG) is missing or empty in your environment variables.");
         }
-
         let firebaseConfig;
         try {
           firebaseConfig = JSON.parse(firebaseConfigStr);
@@ -35,12 +33,11 @@ export const AuthProvider = ({ children }) => {
           console.error("Invalid JSON in VITE_FIREBASE_CONFIG:", e);
           throw new Error("Failed to parse VITE_FIREBASE_CONFIG. Please ensure it is valid JSON.");
         }
-
         if (Object.keys(firebaseConfig).length > 0) {
           app = initializeApp(firebaseConfig);
           auth = getAuth(app);
           db = getFirestore(app);
-          storage = getStorage(app); // Initialize Storage
+          storage = getStorage(app);
           console.log('Firebase initialized in AuthProvider.');
         } else {
           throw new Error("Firebase config is an empty object.");
@@ -51,14 +48,9 @@ export const AuthProvider = ({ children }) => {
         setIsLoading(false);
       }
     };
-
     initializeFirebase();
-    if (!auth) {
-      // If initialization failed, firebaseError will be set, so we can just return.
-      return;
-    }
+    if (!auth) return;
 
-    // Sign in with token or anonymously
     const initialAuthToken = import.meta.env.VITE_INITIAL_AUTH_TOKEN || null;
     if (initialAuthToken) {
       signInWithCustomToken(auth, initialAuthToken).catch(error => {
@@ -68,56 +60,66 @@ export const AuthProvider = ({ children }) => {
     } else {
       signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
     }
-
     const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
-      if (!authUser) {
-        setUserProfile(null);
-        setIsLoading(false);
-      }
+      if (!authUser) setUserProfile(null);
+      setIsLoading(false);
     });
-
     return () => unsubscribeAuth();
   }, []);
 
   useEffect(() => {
-    if (user && db) { // Ensure db is initialized
-      const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
+    if (!user || !db) return;
 
-      const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
-        if (docSnap.exists()) {
-          setUserProfile(docSnap.data());
-        } else {
-          // Create a default profile if it doesn't exist
-          const defaultProfile = {
-            name: `مستخدم_${user.uid.substring(0, 4)}`,
-            avatar: `https://placehold.co/128x128/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${'م'}`,
-            xp: 0,
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(userDocRef, defaultProfile);
-          setUserProfile(defaultProfile);
-        }
-        setIsLoading(false);
-      }, (error) => {
-        console.error("Error fetching user profile:", error);
-        setIsLoading(false);
-      });
+    const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
 
-      return () => unsubscribeProfile();
-    }
+    // Set status to online
+    updateDoc(userDocRef, { status: 'online' }).catch(() => {}); // Fails if doc doesn't exist, which is fine
+
+    const handleBeforeUnload = () => {
+      updateDoc(userDocRef, { status: 'offline', lastSeen: serverTimestamp() });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        setUserProfile(docSnap.data());
+      } else {
+        const defaultProfile = {
+          name: `مستخدم_${user.uid.substring(0, 4)}`,
+          avatar: `https://placehold.co/128x128/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${'م'}`,
+          xp: 0,
+          bio: '',
+          status: 'online',
+          lastSeen: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(userDocRef, defaultProfile);
+        setUserProfile(defaultProfile);
+      }
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching user profile:", error);
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubscribeProfile();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      updateDoc(userDocRef, { status: 'offline', lastSeen: serverTimestamp() });
+    };
   }, [user]);
 
-  const sendNotification = async (targetUserId, type, message) => {
-    if (!db || !userProfile) return;
+  const sendNotification = async (targetUserId, type, message, payload = {}) => {
+    if (!db) return;
     const notificationsPath = getUserNotificationsPath(appId, targetUserId);
     try {
       await addDoc(collection(db, notificationsPath), {
         type,
         message,
-        user: userProfile.name, // The sender's name
+        payload,
         read: false,
-        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp(),
       });
     } catch (error) {
       console.error("Error sending notification:", error);
