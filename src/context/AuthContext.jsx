@@ -2,13 +2,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { getUserProfilePath, getUserNotificationsPath } from '../constants';
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
-let app, auth, db;
+let app, auth, db, storage;
 const appId = import.meta.env.VITE_APP_ID || 'default-app-id';
 
 export const AuthProvider = ({ children }) => {
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }) => {
           app = initializeApp(firebaseConfig);
           auth = getAuth(app);
           db = getFirestore(app);
+          storage = getStorage(app); // Initialize Storage
           console.log('Firebase initialized in AuthProvider.');
         } else {
           throw new Error("Firebase config is an empty object.");
@@ -127,6 +129,7 @@ export const AuthProvider = ({ children }) => {
     userProfile,
     auth,
     db,
+    storage,
     appId,
     isLoading,
     logout: () => signOut(auth),
