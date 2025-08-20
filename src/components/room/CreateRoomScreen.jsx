@@ -4,6 +4,7 @@ import { CornerUpLeft } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { getRoomsPath } from '../../constants';
 
 const CreateRoomScreen = () => {
   const { user, userProfile, db, appId } = useAuth();
@@ -19,7 +20,7 @@ const CreateRoomScreen = () => {
 
     setIsLoading(true);
     try {
-      const roomsCollectionRef = collection(db, `/artifacts/${appId}/public/data/rooms`);
+      const roomsCollectionRef = collection(db, getRoomsPath(appId));
       const newRoom = {
         title: roomTitle,
         description: roomDescription,

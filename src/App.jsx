@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeProvider';
 import { ThemeContext } from './context/ThemeContext';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { getUserNotificationsPath } from './constants';
 
 // Component Imports
 import LoginScreen from './components/auth/LoginScreen';
@@ -40,7 +41,7 @@ const AppContent = () => {
   // Set up real-time listener for notifications
   useEffect(() => {
     if (user && db) {
-      const notificationsPath = `/artifacts/${appId}/users/${user.uid}/notifications`;
+      const notificationsPath = getUserNotificationsPath(appId, user.uid);
       const q = query(collection(db, notificationsPath), orderBy('timestamp', 'desc'));
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {

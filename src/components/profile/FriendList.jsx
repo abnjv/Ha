@@ -4,6 +4,7 @@ import { CornerUpLeft, UserPlus, UserMinus } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { getUserFriendsPath } from '../../constants';
 
 const FriendList = () => {
   const { user, db, appId } = useAuth();
@@ -14,7 +15,8 @@ const FriendList = () => {
 
   useEffect(() => {
     if (!db || !user?.uid) return;
-    const friendsCollectionRef = collection(db, `/artifacts/${appId}/users/${user.uid}/friends`);
+    const friendsPath = getUserFriendsPath(appId, user.uid);
+    const friendsCollectionRef = collection(db, friendsPath);
     const q = query(friendsCollectionRef);
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -36,11 +38,11 @@ const FriendList = () => {
     if (!db || !user) return;
     try {
       // 1. Remove friend from current user's friend list
-      const userFriendRef = doc(db, `/artifacts/${appId}/users/${user.uid}/friends`, friendId);
+      const userFriendRef = doc(db, getUserFriendsPath(appId, user.uid), friendId);
       await deleteDoc(userFriendRef);
 
       // 2. Remove current user from friend's friend list
-      const friendUserRef = doc(db, `/artifacts/${appId}/users/${friendId}/friends`, user.uid);
+      const friendUserRef = doc(db, getUserFriendsPath(appId, friendId), user.uid);
       await deleteDoc(friendUserRef);
 
       console.log(`Removed friend: ${friendId}`);
