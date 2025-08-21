@@ -37,6 +37,15 @@ const VoiceChatRoom = () => {
   const [typingUsers, setTypingUsers] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [roomBackground, setRoomBackground] = useState(null);
+
+  // Simulate fetching equipped background from user's profile
+  useEffect(() => {
+    // TODO: Fetch the user's equippedItems.background from Firebase
+    // For now, using a mock URL.
+    const mockEquippedBackgroundUrl = 'https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1855&q=80';
+    setRoomBackground(mockEquippedBackgroundUrl);
+  }, []);
 
   const createPeerConnection = useCallback((targetSocketId, isOfferor) => {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
@@ -90,9 +99,12 @@ const VoiceChatRoom = () => {
   const ReplyQuote = ({ msg }) => <div className="p-2 mb-1 text-xs bg-gray-800 rounded-lg"><p className="font-bold text-gray-400">{msg.senderName}</p><p className="opacity-80 truncate">{msg.text}</p></div>;
 
   return (
-    <div className="h-screen bg-gray-800 text-white grid grid-cols-1 md:grid-cols-4">
-      <div className="md:col-span-3 flex flex-col h-screen bg-gray-900">
-        <header className="flex justify-between items-center p-4 border-b border-gray-700"><h1 className="text-xl font-bold">Room: {roomId}</h1><button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600"><X size={20}/></button></header>
+    <div
+      className="h-screen bg-cover bg-center text-white grid grid-cols-1 md:grid-cols-4"
+      style={{ backgroundImage: roomBackground ? `url(${roomBackground})` : 'none', backgroundColor: !roomBackground ? '#1f2937' : 'transparent' }}
+    >
+      <div className="md:col-span-3 flex flex-col h-screen bg-black bg-opacity-50">
+        <header className="flex justify-between items-center p-4 border-b border-gray-700 bg-black bg-opacity-30"><h1 className="text-xl font-bold">Room: {roomId}</h1><button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600"><X size={20}/></button></header>
         <div className="flex-grow p-4 overflow-y-auto"><div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">{participants.map(p => (<div key={p.id} className={`relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${speakingState[findSocketIdByUid(p.id)] ? 'border-2 border-green-400' : ''}`}><img src={p.avatar} alt={p.name} className="w-24 h-24 rounded-full mb-2" /><p className="font-semibold text-center text-sm">{p.name}</p></div>))}</div></div>
         <footer className="p-4 bg-gray-950 flex justify-center items-center space-x-4 border-t border-gray-700"><button onClick={isJoined ? endVoiceChat : startVoiceChat} className={`p-4 rounded-full text-white shadow-lg ${isJoined ? 'bg-red-600' : 'bg-green-600'}`}>{isJoined ? <PhoneMissed /> : <PhoneCall />}</button>{isJoined && <button onClick={toggleMute} className={`p-4 rounded-full shadow-lg ${isMuted ? 'bg-gray-600' : 'bg-blue-600'}`}>{isMuted ? <MicOff /> : <Mic />}</button>}</footer>
       </div>

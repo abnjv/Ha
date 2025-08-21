@@ -91,6 +91,8 @@ export const AuthProvider = ({ children }) => {
           xp: 0,
           bio: '',
           status: 'online',
+          julesCoins: 1000, // Starting balance for new users
+          purchasedItems: [], // Initialize empty inventory
           lastSeen: serverTimestamp(),
           createdAt: serverTimestamp(),
         };
