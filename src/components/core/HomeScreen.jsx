@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, User as UserIcon, Home, Bell, Sun } from 'lucide-react';
+import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio } from 'lucide-react';
+import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
@@ -14,7 +15,27 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   const [rooms, setRooms] = useState([]);
   const [friends, setFriends] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [isLoading, setIsLoading] =useState(true);
+  const [activeStreams, setActiveStreams] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const socketRef = useRef();
+
+  useEffect(() => {
+    // Connect to signaling server to listen for stream updates
+    socketRef.current = io(import.meta.env.VITE_SIGNALING_SERVER_URL);
+
+    socketRef.current.on('new-stream-available', (streamId) => {
+      setActiveStreams(prev => [...prev, streamId]);
+    });
+
+    socketRef.current.on('stream-ended', (streamId) => {
+      setActiveStreams(prev => prev.filter(id => id !== streamId));
+    });
+
+    return () => {
+      socketRef.current.disconnect();
+    };
+  }, []);
 
   // Fetch public rooms
   useEffect(() => {
@@ -40,7 +61,6 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   // Fetch user's groups
   useEffect(() => {
     if (!db || !user?.uid) return;
-    // This query finds groups where the user's ID exists as a key in the 'members' map.
     const groupsQuery = query(collection(db, getGroupsPath(appId)), where(`members.${user.uid}`, '!=', null));
     const unsubscribeGroups = onSnapshot(groupsQuery, (snapshot) => {
       setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -48,48 +68,53 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
     return () => unsubscribeGroups();
   }, [db, appId, user]);
 
-
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+    try { await logout(); } catch (error) { console.error("Logout failed:", error); }
   };
 
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex justify-between items-center p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <div className="flex items-center space-x-2"><div className="p-2 bg-blue-600 rounded-full"><Home className="w-6 h-6 text-white" /></div><span className="text-2xl font-extrabold">AirChat</span></div>
         <div className="flex items-center space-x-2">
-          <div className="p-2 bg-blue-600 rounded-full"><Home className="w-6 h-6 text-white" /></div>
-          <span className="text-2xl font-extrabold">AirChat</span>
-        </div>
-        <div className="flex items-center space-x-4">
+          <button onClick={() => navigate('/stream/start')} className="px-4 py-2 bg-purple-600 text-white rounded-full font-bold shadow-lg hover:bg-purple-700 flex items-center space-x-2"><Radio size={16} /><span>Go Live</span></button>
           <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-gray-700"><Sun className="w-6 h-6 text-yellow-500" /></button>
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
-          <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative">
-            <Bell className="w-6 h-6 text-white" />
-            {hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}
-          </button>
+          <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative"><Bell className="w-6 h-6 text-white" />{hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}</button>
           <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ml-1" /> Logout</button>
         </div>
       </header>
 
       <main className="flex-1 p-4 grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2">
-          <h2 className="text-2xl font-bold mb-4">Public Rooms</h2>
-          {isLoading ? <p>Loading rooms...</p> : (
-            <div className="space-y-4">
-              {rooms.map(room => (
-                <div key={room.id} onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                  <div><h3 className="font-bold">{room.title}</h3><p className="text-sm text-gray-400">{room.description}</p></div>
-                  <button className="p-2 rounded-full bg-green-600 text-white">Join</button>
-                </div>
-              ))}
-              <button onClick={() => navigate('/dashboard')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">Browse All Rooms...</button>
-            </div>
-          )}
+        <div className="md:col-span-2 space-y-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Live Streams</h2>
+            {activeStreams.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeStreams.map(streamId => (
+                  <div key={streamId} onClick={() => navigate(`/stream/watch/${streamId}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                    <div><h3 className="font-bold">Stream by {streamId.substring(0, 8)}</h3></div>
+                    <button className="p-2 rounded-full bg-red-600 text-white animate-pulse">LIVE</button>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-gray-500">No active streams right now.</p>}
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Public Rooms</h2>
+            {isLoading ? <p>Loading rooms...</p> : (
+              <div className="space-y-4">
+                {rooms.map(room => (
+                  <div key={room.id} onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                    <div><h3 className="font-bold">{room.title}</h3><p className="text-sm text-gray-400">{room.description}</p></div>
+                    <button className="p-2 rounded-full bg-green-600 text-white">Join</button>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/dashboard')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">Browse All Rooms...</button>
+              </div>
+            )}
+          </div>
         </div>
         <div className="space-y-8">
           <div>
