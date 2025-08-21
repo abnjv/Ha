@@ -26,6 +26,7 @@ import VirtualStore from './components/store/VirtualStore';
 import InventoryScreen from './components/store/InventoryScreen';
 import ThreeDRoom from './components/world/ThreeDRoom';
 import MyRecordings from './components/recordings/MyRecordings';
+import CreatorDashboard from './components/creator/CreatorDashboard';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -106,6 +107,7 @@ const AppContent = () => {
           <Route path="/inventory" element={<InventoryScreen />} />
           <Route path="/world" element={<ThreeDRoom />} />
           <Route path="/my-recordings" element={<MyRecordings />} />
+          <Route path="/creator/dashboard" element={<CreatorDashboard />} />
         </Route>
 
         {/* Redirect any unknown paths to the home page if logged in, or login if not */}
