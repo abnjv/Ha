@@ -37,3 +37,8 @@ export const getUserProfilePath = (appId, userId) => `${getUserPath(appId, userI
 export const getUserFriendsPath = (appId, userId) => `${getUserPath(appId, userId)}/friends`;
 
 export const getUserNotificationsPath = (appId, userId) => `${getUserPath(appId, userId)}/notifications`;
+
+// --- Virtual User Constants ---
+export const SUPPORT_BOT_ID = 'support-bot-01';
+export const SUPPORT_BOT_NAME = 'Support Bot';
+export const SUPPORT_BOT_AVATAR = 'https://placehold.co/128x128/6B46C1/FFFFFF?text=BOT';
