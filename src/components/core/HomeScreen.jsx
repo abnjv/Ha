@@ -29,9 +29,26 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
     return () => { socketRef.current.disconnect(); };
   }, []);
 
-  useEffect(() => { if (!db) return; const roomsQuery = query(collection(db, getRoomsPath(appId)), orderBy('createdAt', 'desc'), limit(5)); const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot) => { setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); setIsLoading(false); }); return () => unsubscribeRooms(); }, [db, appId]);
-  useEffect(() => { if (!db || !user?.uid) return; const friendsQuery = query(collection(db, getUserFriendsPath(appId, user.uid)), limit(5)); const unsubscribeFriends = onSnapshot(friendsQuery, (snapshot) => { setFriends(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }); return () => unsubscribeFriends(); }, [db, appId, user]);
-  useEffect(() => { if (!db || !user?.uid) return; const groupsQuery = query(collection(db, getGroupsPath(appId)), where(`members.${user.uid}`, '!=', null)); const unsubscribeGroups = onSnapshot(groupsQuery, (snapshot) => { setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }); return () => unsubscribeGroups(); }, [db, appId, user]);
+  useEffect(() => {
+    if (!db) return;
+    const roomsQuery = query(collection(db, getRoomsPath(appId)), orderBy('createdAt', 'desc'), limit(5));
+    const unsubscribeRooms = onSnapshot(roomsQuery, (snapshot) => { setRooms(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); setIsLoading(false); });
+    return () => unsubscribeRooms();
+  }, [db, appId]);
+
+  useEffect(() => {
+    if (!db || !user?.uid) return;
+    const friendsQuery = query(collection(db, getUserFriendsPath(appId, user.uid)), limit(5));
+    const unsubscribeFriends = onSnapshot(friendsQuery, (snapshot) => { setFriends(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); });
+    return () => unsubscribeFriends();
+  }, [db, appId, user]);
+
+  useEffect(() => {
+    if (!db || !user?.uid) return;
+    const groupsQuery = query(collection(db, getGroupsPath(appId)), where(`members.${user.uid}`, '!=', null));
+    const unsubscribeGroups = onSnapshot(groupsQuery, (snapshot) => { setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); });
+    return () => unsubscribeGroups();
+  }, [db, appId, user]);
 
   const handleLogout = async () => {
     try { await logout(); } catch (error) { console.error("Logout failed:", error); }
@@ -48,36 +65,85 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
           <button onClick={() => navigate(`/chat/${SUPPORT_BOT_ID}/${SUPPORT_BOT_NAME}`)} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
           <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative"><Bell className="w-6 h-6 text-white" />{hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}</button>
-          <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ms-1" /> {t('logout', 'Logout')}</button>
+          <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ms-1" /> Logout</button>
         </div>
       </header>
 
       <main className="flex-1 p-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-8">
           <div>
-            <h2 className="text-2xl font-bold mb-4 flex items-center space-x-2"><span>Virtual Worlds</span></h2>
-            <div onClick={() => navigate(`/world/main-plaza`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div><h3 className="font-bold">Main Plaza</h3><p className="text-sm text-gray-400">The central hub of our world.</p></div>
-                <button className="p-2 rounded-full bg-green-600 text-white">Enter World</button>
+            <h2 className="text-2xl font-bold mb-4">{t('metaverse', 'Metaverse Features')}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+               <div onClick={() => navigate('/store')} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div><h3 className="font-bold">{t('store', 'Virtual Store')}</h3><p className="text-sm text-gray-400">{t('storeDescription', 'Buy backgrounds and skins.')}</p></div>
+                <button className="p-2 rounded-full bg-blue-600 text-white">Explore</button>
+              </div>
+              <div onClick={() => navigate('/inventory')} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div><h3 className="font-bold">{t('inventory', 'My Inventory')}</h3><p className="text-sm text-gray-400">{t('inventoryDescription', 'Manage your purchased items.')}</p></div>
+                <button className="p-2 rounded-full bg-green-600 text-white">Manage</button>
+              </div>
+              <div onClick={() => navigate('/world')} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div><h3 className="font-bold">{t('world', '3D World')}</h3><p className="text-sm text-gray-400">{t('worldDescription', 'Explore the virtual world.')}</p></div>
+                <button className="p-2 rounded-full bg-purple-600 text-white">Enter</button>
+              </div>
             </div>
           </div>
           <div>
             <h2 className="text-2xl font-bold mb-4">{t('liveStreams', 'Live Streams')}</h2>
-            {activeStreams.length > 0 ? (<div className="grid grid-cols-1 md:grid-cols-2 gap-4">{activeStreams.map(streamId => (<div key={streamId} onClick={() => navigate(`/stream/watch/${streamId}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}><div><h3 className="font-bold">{t('streamBy', { user: streamId.substring(0,8) })}</h3></div><button className="p-2 rounded-full bg-red-600 text-white animate-pulse">LIVE</button></div>))}</div>) : <p className="text-gray-500">{t('noActiveStreams')}</p>}
+            {activeStreams.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeStreams.map(streamId => (
+                  <div key={streamId} onClick={() => navigate(`/stream/watch/${streamId}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                    <div><h3 className="font-bold">Stream by {streamId.substring(0, 8)}</h3></div>
+                    <button className="p-2 rounded-full bg-red-600 text-white animate-pulse">LIVE</button>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-gray-500">No active streams right now.</p>}
           </div>
           <div>
             <h2 className="text-2xl font-bold mb-4">{t('publicRooms')}</h2>
-            {isLoading ? <p>Loading...</p> : (<div className="space-y-4">{rooms.map(room => (<div key={room.id} onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}><div><h3 className="font-bold">{room.title}</h3><p className="text-sm text-gray-400">{room.description}</p></div><button className="p-2 rounded-full bg-green-600 text-white">{t('join')}</button></div>))}<button onClick={() => navigate('/dashboard')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">{t('browseAllRooms')}</button></div>)}
+            {isLoading ? <p>Loading rooms...</p> : (
+              <div className="space-y-4">
+                {rooms.map(room => (
+                  <div key={room.id} onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                    <div><h3 className="font-bold">{room.title}</h3><p className="text-sm text-gray-400">{room.description}</p></div>
+                    <button className="p-2 rounded-full bg-green-600 text-white">Join</button>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/dashboard')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">{t('browseAllRooms')}</button>
+              </div>
+            )}
           </div>
         </div>
         <div className="space-y-8">
           <div>
             <h2 className="text-2xl font-bold mb-4">{t('myGroups')}</h2>
-            {isLoading ? <p>Loading...</p> : (<div className="space-y-3">{groups.map(group => (<div key={group.id} onClick={() => navigate(`/group-chat/${group.id}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}><div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white">{group.name.charAt(0)}</div><span className="font-semibold">{group.name}</span></div>))}<button onClick={() => navigate('/create-group')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">{t('createAGroup')}</button></div>)}
+            {isLoading ? <p>Loading...</p> : (
+              <div className="space-y-3">
+                {groups.map(group => (
+                  <div key={group.id} onClick={() => navigate(`/group-chat/${group.id}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                    <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white">{group.name.charAt(0)}</div>
+                    <span className="font-semibold">{group.name}</span>
+                  </div>
+                ))}
+                 <button onClick={() => navigate('/create-group')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">{t('createAGroup')}</button>
+              </div>
+            )}
           </div>
           <div>
             <h2 className="text-2xl font-bold mb-4">{t('recentChats')}</h2>
-            {isLoading ? <p>Loading...</p> : (<div className="space-y-3">{friends.map(friend => (<div key={friend.id} onClick={() => navigate(`/chat/${friend.id}/${friend.name}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}><img src={friend.avatar} alt={friend.name} className="w-10 h-10 rounded-full" /><span className="font-semibold">{friend.name}</span></div>))}<button onClick={() => navigate('/private-chat-list')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">{t('allChats')}</button></div>)}
+            {isLoading ? <p>Loading...</p> : (
+              <div className="space-y-3">
+                {friends.map(friend => (
+                  <div key={friend.id} onClick={() => navigate(`/chat/${friend.id}/${friend.name}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                    <img src={friend.avatar} alt={friend.name} className="w-10 h-10 rounded-full" />
+                    <span className="font-semibold">{friend.name}</span>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/private-chat-list')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">{t('allChats')}</button>
+              </div>
+            )}
           </div>
         </div>
       </main>
