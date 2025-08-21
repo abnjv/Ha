@@ -48,7 +48,18 @@ io.on('connection', (socket) => {
   });
   socket.on('watch-stream', (streamId) => { const broadcasterSocketId = streams[streamId]; if (broadcasterSocketId) { console.log(`User ${socket.id} is watching stream ${streamId}`); io.to(broadcasterSocketId).emit('new-watcher', { watcherId: socket.id }); } });
   socket.on('stream-signal-to-watcher', (data) => { io.to(data.watcherId).emit('stream-signal-from-broadcaster', { broadcasterId: socket.id, signal: data.signal }); });
-  socket.on('watcher-signal-to-streamer', (data) => { io.to(data.broadcasterId).emit('watcher-signal', { watcherId: socket.id, signal: data.signal }); });
+
+  socket.on('watcher-signal-to-streamer', (data) => {
+    // Find broadcaster's socket ID either directly from data (for an answer)
+    // or by looking it up from the streamId (for ICE candidates).
+    const broadcasterSocketId = data.broadcasterId || streams[data.streamId];
+    if (broadcasterSocketId) {
+      io.to(broadcasterSocketId).emit('watcher-signal', { watcherId: socket.id, signal: data.signal });
+    } else {
+      console.log(`Could not find broadcaster for stream: ${data.streamId}`);
+    }
+  });
+
   socket.on('stop-stream', (streamId) => { if (streams[streamId] === socket.id) { delete streams[streamId]; console.log(`Stream ${streamId} ended.`); io.emit('stream-ended', streamId); } });
 
   // --- Tic-Tac-Toe Game Logic ---
