@@ -26,11 +26,11 @@ try {
 const db = getFirestore();
 
 const virtualItems = [
-  { id: 'bg001', name: 'Cosmic Space Background', type: 'background', price: 100, imageUrl: 'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1742&q=80' },
-  { id: 'bg002', name: 'Peaceful Beach Background', type: 'background', price: 120, imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723a9ce6890?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80' },
-  { id: 'bg003', name: 'Retro Arcade Background', type: 'background', price: 150, imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1742&q=80' },
-  { id: 'mic001', name: 'Golden Microphone Skin', type: 'mic_skin', price: 50, imageUrl: 'https://via.placeholder.com/150/FFD700/000000?Text=Gold+Mic' },
-  { id: 'mic002', name: 'Neon Blue Microphone Skin', type: 'mic_skin', price: 75, imageUrl: 'https://via.placeholder.com/150/00FFFF/000000?Text=Neon+Mic' },
+  { id: 'bg001', name: 'Cosmic Space Background', type: 'background', price: 100, imageUrl: 'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1742&q=80', creatorId: 'SYSTEM' },
+  { id: 'bg002', name: 'Peaceful Beach Background', type: 'background', price: 120, imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723a9ce6890?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80', creatorId: 'SYSTEM' },
+  { id: 'bg003', name: 'Retro Arcade Background', type: 'background', price: 150, imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1742&q=80', creatorId: 'SYSTEM' },
+  { id: 'mic001', name: 'Golden Microphone Skin', type: 'mic_skin', price: 50, imageUrl: 'https://via.placeholder.com/150/FFD700/000000?Text=Gold+Mic', creatorId: 'SYSTEM' },
+  { id: 'mic002', name: 'Neon Blue Microphone Skin', type: 'mic_skin', price: 75, imageUrl: 'https://via.placeholder.com/150/00FFFF/000000?Text=Neon+Mic', creatorId: 'SYSTEM' },
 ];
 
 async function seedDatabase() {

@@ -119,6 +119,7 @@ export const AuthProvider = ({ children }) => {
           status: 'online',
           julesCoins: 1000, // Starting balance for new users
           purchasedItems: [], // Initialize empty inventory
+          isCreator: false, // Default to not being a creator
           lastSeen: serverTimestamp(),
           createdAt: serverTimestamp(),
         };

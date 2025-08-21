@@ -27,7 +27,17 @@ const VirtualStore = () => {
     fetchItems();
   }, [db, appId]);
 
+  const handleSubscribe = async (item) => {
+    // Placeholder for subscription logic
+    alert(`Subscribing to ${item.name} is not implemented yet.`);
+  };
+
   const handleBuy = async (item) => {
+    if (item.type === 'subscription') {
+      await handleSubscribe(item);
+      return;
+    }
+
     if (!user || !userProfile) {
       alert("You must be logged in to make a purchase.");
       return;
@@ -71,10 +81,11 @@ const VirtualStore = () => {
         {items.map((item) => {
           const alreadyOwned = userProfile?.purchasedItems?.includes(item.id);
           return (
-            <div key={item.id} className="bg-gray-800 rounded-lg p-4 flex flex-col items-center shadow-lg transition-transform transform hover:scale-105">
+            <div key={item.id} className="bg-gray-800 rounded-lg p-4 flex flex-col shadow-lg transition-transform transform hover:scale-105">
               <img src={item.imageUrl} alt={item.name} className="w-full h-40 object-cover rounded-md mb-4" />
-              <h2 className="text-xl font-semibold mb-2">{item.name}</h2>
-              <p className="text-yellow-400 text-lg mb-4">{item.price} Jules Coins</p>
+              <h2 className="text-xl font-semibold mb-2 flex-grow">{item.name}</h2>
+              {item.creatorId && <p className="text-xs text-gray-400 mb-2 self-start">By: {item.creatorId === 'SYSTEM' ? 'Official Store' : item.creatorId.substring(0, 10)}</p>}
+              <p className="text-yellow-400 text-lg mb-4 font-bold self-start">{item.price} Jules Coins</p>
               <button
                 onClick={() => handleBuy(item)}
                 disabled={alreadyOwned || purchasing === item.id}
