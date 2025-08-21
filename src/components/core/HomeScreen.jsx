@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy, Clapperboard, LayoutDashboard } from 'lucide-react';
+import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy, Clapperboard, LayoutDashboard, Crown } from 'lucide-react';
 import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -64,6 +64,7 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
           <button onClick={() => navigate('/my-recordings')} className="p-2 rounded-full hover:bg-gray-700" title="My Recordings"><Clapperboard className="w-6 h-6 text-purple-500" /></button>
+          <button onClick={() => navigate('/subscriptions')} className="p-2 rounded-full hover:bg-gray-700" title="Subscriptions"><Crown className="w-6 h-6 text-yellow-400" /></button>
           {userProfile?.isCreator && (
             <button onClick={() => navigate('/creator/dashboard')} className="p-2 rounded-full hover:bg-gray-700" title="Creator Dashboard">
               <LayoutDashboard className="w-6 h-6 text-cyan-500" />
