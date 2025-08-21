@@ -22,6 +22,8 @@ import UserProfileScreen from './components/profile/UserProfileScreen';
 import CreateGroupScreen from './components/group/CreateGroupScreen';
 import GroupChat from './components/group/GroupChat';
 import LiveStream from './components/stream/LiveStream';
+import VirtualStore from './components/store/VirtualStore';
+import InventoryScreen from './components/store/InventoryScreen';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -98,6 +100,8 @@ const AppContent = () => {
           <Route path="/group-chat/:groupId" element={<GroupChat />} />
           <Route path="/stream/start" element={<LiveStream />} />
           <Route path="/stream/watch/:streamId" element={<LiveStream />} />
+          <Route path="/store" element={<VirtualStore />} />
+          <Route path="/inventory" element={<InventoryScreen />} />
         </Route>
 
         {/* Redirect any unknown paths to the home page if logged in, or login if not */}
