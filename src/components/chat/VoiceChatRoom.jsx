@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { Mic, MicOff, PhoneCall, PhoneMissed, Send, MessageSquare, MoreHorizontal, Edit, Trash2, X, Paperclip, File as FileIcon, Video, VideoOff, Circle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { collection, query, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, addDoc, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, addDoc, updateDoc, Timestamp, orderBy, getDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { getVoiceRoomParticipantsPath, getVoiceRoomMessagesPath, getVoiceRoomPath } from '../../constants';
 
@@ -45,13 +45,24 @@ const VoiceChatRoom = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingUploadProgress, setRecordingUploadProgress] = useState(null);
 
-  // Simulate fetching equipped background from user's profile
+  // Fetch equipped background from user's profile
   useEffect(() => {
-    // TODO: Fetch the user's equippedItems.background from Firebase
-    // For now, using a mock URL.
-    const mockEquippedBackgroundUrl = 'https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1855&q=80';
-    setRoomBackground(mockEquippedBackgroundUrl);
-  }, []);
+    const fetchBackground = async () => {
+      if (userProfile?.equippedItems?.background) {
+        const bgId = userProfile.equippedItems.background;
+        try {
+          const itemDocRef = doc(db, `apps/${appId}/virtualItems`, bgId);
+          const itemDoc = await getDoc(itemDocRef);
+          if (itemDoc.exists() && itemDoc.data().imageUrl) {
+            setRoomBackground(itemDoc.data().imageUrl);
+          }
+        } catch (e) {
+            console.error("Could not fetch background", e)
+        }
+      }
+    };
+    fetchBackground();
+  }, [userProfile, db, appId]);
 
   const createPeerConnection = useCallback((targetSocketId, isOfferor) => {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
