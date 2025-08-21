@@ -6,7 +6,7 @@ import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../../context/AuthContext';
-import { getPrivateChatMessagesPath, getPrivateChatsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME, getUserProfilePath } from '../../constants';
+import { getPrivateChatMessagesPath, getPrivateChatsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME, SUPPORT_BOT_AVATAR, getUserProfilePath } from '../../constants';
 import { getBotResponse } from '../../bot/supportBot';
 import ProfileModal from '../profile/ProfileModal';
 import { get as getKey } from '../../utils/db';
@@ -32,6 +32,7 @@ const PrivateChat = () => {
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
   const [sharedSecretKey, setSharedSecretKey] = useState(null);
+  const [isBotTyping, setIsBotTyping] = useState(false);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -84,11 +85,20 @@ const PrivateChat = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (inputMessage.trim() === '') return;
+    if (inputMessage.trim() === '' || isSendingMessage) return;
     setIsSendingMessage(true);
 
     if (isChatWithBot) {
-      // ... (bot logic remains the same)
+      const userMessage = { id: `user-${Date.now()}`, senderId: user.uid, text: inputMessage, createdAt: { toDate: () => new Date() } };
+      setMessages(prev => [...prev, userMessage]);
+      setIsBotTyping(true);
+
+      setTimeout(() => {
+        const botResponseText = getBotResponse(inputMessage);
+        const botMessage = { id: `bot-${Date.now()}`, senderId: SUPPORT_BOT_ID, text: botResponseText, createdAt: { toDate: () => new Date() } };
+        setMessages(prev => [...prev, botMessage]);
+        setIsBotTyping(false);
+      }, 1200 + Math.random() * 800); // Add jitter to delay
     } else {
       if (!sharedSecretKey) {
         alert("Encryption keys are not ready. Please wait.");
@@ -153,7 +163,13 @@ const PrivateChat = () => {
       {/* ... (rest of the chat JSX remains largely the same, without the GameOverlay) ... */}
        <div className={`flex-1 flex flex-col p-4 rounded-3xl shadow-xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="flex-1 overflow-y-auto mb-4 p-4 space-y-4 custom-scrollbar">
-            {/* Message mapping logic using DecryptedMessage */}
+          {isLoading ? <div className="flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-dashed rounded-full animate-spin border-blue-500"></div></div> : (
+            <TransitionGroup>{messages.map((message) => <CSSTransition key={message.id} timeout={300} classNames="message-item"><div className={`message-item group flex items-end gap-2 relative ${message.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>{message.senderId !== user.uid && (<img src={SUPPORT_BOT_AVATAR} alt="Bot Avatar" className="w-8 h-8 rounded-full"/>)}<div className={`max-w-xs md:max-w-md p-3 rounded-xl shadow-md ${message.senderId === user.uid ? 'bg-blue-600 text-white' : (isChatWithBot ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-900') }`}>{!isChatWithBot && message.replyTo && <ReplyQuote msg={message.replyTo} />}{editingMessageId === message.id ? (<form onSubmit={handleUpdateMessage}><input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-blue-700 text-white rounded p-1" autoFocus/><div className="flex justify-end space-x-2 mt-2"><button type="button" onClick={() => setEditingMessageId(null)} className="text-xs">Cancel</button><button type="submit" className="text-xs font-bold">Save</button></div></form>) : (message.type === 'image' ? <img src={message.file.url} alt={message.file.name} className="rounded-lg max-w-full h-auto" /> : message.type === 'file' ? <a href={message.file.url} target="_blank" rel="noopener noreferrer" className="flex items-center underline"><FileIcon className="me-2"/>{message.file.name}</a> : <DecryptedMessage message={message} />)}<span className={`block mt-1 text-xs ${message.senderId === user.uid ? 'text-blue-200' : 'text-gray-400'}`}>{message.createdAt?.seconds ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString('ar-SA') : ''} {!isChatWithBot && message.isEdited && <i>(edited)</i>}</span></div></div></CSSTransition>)}</TransitionGroup>)}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="h-5 text-sm text-gray-400 italic px-2">
+          {isChatWithBot && isBotTyping && <p className="animate-pulse">Bot is typing...</p>}
+          {!isChatWithBot && typingUsers.length > 0 && `${typingUsers.join(', ')} is typing...`}
         </div>
         <div className="border-t border-gray-700 pt-4">
             {/* Form for sending messages */}
