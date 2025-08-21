@@ -29,6 +29,7 @@ import MyRecordings from './components/recordings/MyRecordings';
 import CreatorDashboard from './components/creator/CreatorDashboard';
 import SubscriptionPlans from './components/creator/SubscriptionPlans';
 import GameLobby from './components/game/GameLobby';
+import ReloadPrompt from './components/core/ReloadPrompt';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -88,6 +89,7 @@ const AppContent = () => {
 
   return (
     <Layout>
+      <ReloadPrompt />
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getUserProfilePath } from '../../constants';
 
 const VirtualStore = () => {
@@ -32,6 +32,18 @@ const VirtualStore = () => {
     alert(`Subscribing to ${item.name} is not implemented yet.`);
   };
 
+  const logTransaction = async (transactionData) => {
+    try {
+      const transactionsColPath = `apps/${appId}/transactions`;
+      await addDoc(collection(db, transactionsColPath), {
+        ...transactionData,
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.error("Failed to log transaction:", e);
+    }
+  };
+
   const handleBuy = async (item) => {
     if (item.type === 'subscription') {
       await handleSubscribe(item);
@@ -52,17 +64,38 @@ const VirtualStore = () => {
     }
 
     setPurchasing(item.id);
+    const transactionId = `${user.uid}-${item.id}-${Date.now()}`;
     try {
       const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
       const newCoinBalance = userProfile.julesCoins - item.price;
 
+      // This is a client-side transaction. For higher security,
+      // this should be a server-side transaction using Firebase Functions.
       await updateDoc(userDocRef, {
         julesCoins: newCoinBalance,
         purchasedItems: arrayUnion(item.id)
       });
 
+      await logTransaction({
+        transactionId,
+        userId: user.uid,
+        itemId: item.id,
+        itemName: item.name,
+        price: item.price,
+        status: 'SUCCESS',
+      });
+
       alert(`Successfully purchased ${item.name}!`);
     } catch (error) {
+      await logTransaction({
+        transactionId,
+        userId: user.uid,
+        itemId: item.id,
+        itemName: item.name,
+        price: item.price,
+        status: 'FAILED',
+        error: error.message,
+      });
       console.error("Purchase failed:", error);
       alert("An error occurred during the purchase. Please try again.");
     } finally {
