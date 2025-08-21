@@ -1,14 +1,14 @@
 import React, { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { useAuth } from '../../context/AuthContext';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { UploadCloud, File as FileIcon, X } from 'lucide-react';
+import { UploadCloud, File as FileIcon, X, AlertTriangle } from 'lucide-react';
 
-const UploadSystem = ({ onUploadSuccess, uploadPath = 'uploads' }) => {
+const UploadSystem = ({ onUploadSuccess, uploadPath = 'uploads', maxFileSize = 2 * 1024 * 1024 * 1024 /* 2GB */ }) => {
   const { storage } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState(null);
 
   const handleUpload = useCallback((fileToUpload) => {
@@ -37,66 +37,73 @@ const UploadSystem = ({ onUploadSuccess, uploadPath = 'uploads' }) => {
         getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
           onUploadSuccess(downloadURL, fileToUpload.name, fileToUpload.type);
           setIsUploading(false);
-          setFile(null);
+          // Keep the file displayed until the form is submitted
         });
       }
     );
   }, [storage, uploadPath, onUploadSuccess]);
 
-  const handleFileSelect = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      handleUpload(selectedFile);
+  const onDrop = useCallback((acceptedFiles, fileRejections) => {
+    setError('');
+    if (fileRejections.length > 0) {
+      const firstError = fileRejections[0].errors[0];
+      if (firstError.code === 'file-too-large') {
+        setError(`File is too large. Max size is ${maxFileSize / (1024*1024)}MB.`);
+      } else {
+        setError(firstError.message);
+      }
+      return;
     }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      handleUpload(droppedFile);
+    if (acceptedFiles.length > 0) {
+      handleUpload(acceptedFiles[0]);
     }
+  }, [handleUpload, maxFileSize]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    maxSize: maxFileSize,
+    multiple: false,
+    accept: {
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'video/mp4': ['.mp4'],
+      'audio/mpeg': ['.mp3'],
+      'application/pdf': ['.pdf'],
+    }
+  });
+
+  const removeFile = () => {
+    // Note: This does not cancel an ongoing upload.
+    // A real implementation would need to call `uploadTask.cancel()`.
+    setFile(null);
+    setIsUploading(false);
+    setError('');
+    setProgress(0);
   };
 
   return (
     <div className="w-full">
-      <label
-        htmlFor="file-upload"
-        className={`relative block w-full border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
-                    ${isDragging ? 'border-blue-500 bg-blue-900/30' : 'border-gray-600 hover:border-gray-500'}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <div className="flex flex-col items-center">
-          <UploadCloud className="w-12 h-12 text-gray-500" />
-          <span className="mt-2 block text-sm font-semibold text-gray-400">
-            Drag & Drop or <span className="text-blue-400">browse</span> to upload
-          </span>
+      {!file ? (
+        <div {...getRootProps()} className={`relative block w-full border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
+                      ${isDragActive ? 'border-blue-500 bg-blue-900/30' : 'border-gray-600 hover:border-gray-500'}`}>
+          <input {...getInputProps()} disabled={isUploading} />
+          <div className="flex flex-col items-center">
+            <UploadCloud className="w-12 h-12 text-gray-500" />
+            <span className="mt-2 block text-sm font-semibold text-gray-400">
+              Drag & Drop or <span className="text-blue-400">browse</span>
+            </span>
+            <span className="mt-1 block text-xs text-gray-500">MP4, MP3, PDF, PNG, JPG up to 2GB</span>
+          </div>
         </div>
-        <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileSelect} disabled={isUploading} />
-      </label>
-
-      {file && (
+      ) : (
         <div className="mt-4 p-2 bg-gray-700 rounded-lg">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <FileIcon className="w-5 h-5 text-gray-400" />
+            <div className="flex items-center space-x-2 overflow-hidden">
+              <FileIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <span className="text-sm text-gray-300 truncate">{file.name}</span>
             </div>
             {!isUploading && (
-              <button onClick={() => setFile(null)} className="p-1 text-gray-400 hover:text-white">
+              <button onClick={removeFile} className="p-1 text-gray-400 hover:text-white flex-shrink-0">
                 <X size={16} />
               </button>
             )}
@@ -109,7 +116,12 @@ const UploadSystem = ({ onUploadSuccess, uploadPath = 'uploads' }) => {
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+      {error && (
+        <div className="mt-2 flex items-center text-sm text-red-500">
+          <AlertTriangle className="w-4 h-4 mr-2" />
+          {error}
+        </div>
+      )}
     </div>
   );
 };

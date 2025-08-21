@@ -1,11 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { BarChart, Edit, Trash2 } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { selectCreatorStats } from '../../features/creator/creatorSlice';
+import { motion } from 'framer-motion';
+import { BarChart, Edit, Trash2, DollarSign, Users, Package } from 'lucide-react';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Bar } from 'react-chartjs-2';
 import UploadSystem from '../shared/UploadSystem';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+
+const StatsChart = ({ stats }) => {
+  const data = {
+    labels: ['Subscribers', 'Revenue'],
+    datasets: [
+      {
+        label: 'Creator Stats',
+        data: [stats.subscribers, stats.monthlyRevenue],
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.5)',
+          'rgba(34, 197, 94, 0.5)',
+        ],
+        borderColor: [
+          'rgba(59, 130, 246, 1)',
+          'rgba(34, 197, 94, 1)',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
+  const options = { responsive: true, plugins: { legend: { display: false } } };
+  return <Bar options={options} data={data} />;
+};
 
 const CreatorDashboard = () => {
   const { user, userProfile, db, appId } = useAuth();
+  const stats = useSelector(selectCreatorStats); // Get stats from Redux
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState({ name: '', type: 'background', price: 100, imageUrl: '' });
   const [loading, setLoading] = useState(true);
@@ -92,28 +123,48 @@ const CreatorDashboard = () => {
 
   return (
     <div className="p-8 bg-gray-900 text-white min-h-screen">
-      <h1 className="text-4xl font-bold mb-8">Creator Dashboard</h1>
+      <motion.h1
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-4xl font-bold mb-8"
+      >
+        Creator Dashboard
+      </motion.h1>
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-gray-800 p-4 rounded-lg text-center">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+      >
+        <div className="bg-gray-800 p-4 rounded-lg text-center flex flex-col items-center justify-center">
+          <Users className="w-8 h-8 text-blue-400 mb-2"/>
           <h3 className="text-lg font-semibold text-gray-400">Total Subscribers</h3>
-          <p className="text-3xl font-bold">1,234</p>
+          <p className="text-3xl font-bold">{stats.subscribers.toLocaleString()}</p>
         </div>
-        <div className="bg-gray-800 p-4 rounded-lg text-center">
+        <div className="bg-gray-800 p-4 rounded-lg text-center flex flex-col items-center justify-center">
+          <DollarSign className="w-8 h-8 text-green-400 mb-2"/>
           <h3 className="text-lg font-semibold text-gray-400">Monthly Revenue</h3>
-          <p className="text-3xl font-bold">$5,678</p>
+          <p className="text-3xl font-bold">${stats.monthlyRevenue.toLocaleString()}</p>
         </div>
-        <div className="bg-gray-800 p-4 rounded-lg text-center">
+        <div className="bg-gray-800 p-4 rounded-lg text-center flex flex-col items-center justify-center">
+          <Package className="w-8 h-8 text-purple-400 mb-2"/>
           <h3 className="text-lg font-semibold text-gray-400">Published Items</h3>
           <p className="text-3xl font-bold">{items.length}</p>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-        <div className="bg-gray-800 p-6 rounded-lg">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto"
+      >
+        <div className="lg:col-span-1 bg-gray-800 p-6 rounded-lg">
           <h2 className="text-2xl font-semibold mb-4">Add New Item</h2>
-          <form onSubmit={handleAddItem} className="space-y-4 p-6 bg-gray-800 rounded-lg">
+          <form onSubmit={handleAddItem} className="space-y-4">
             <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-300">Item Name</label>
                 <input id="name" type="text" name="name" value={newItem.name} onChange={handleInputChange} placeholder="My Awesome Background" className="mt-1 w-full p-2 rounded bg-gray-700 border border-gray-600" />
@@ -146,10 +197,13 @@ const CreatorDashboard = () => {
             <button type="submit" className="w-full p-3 bg-blue-600 rounded hover:bg-blue-700 font-bold">Add Item</button>
           </form>
         </div>
-        <div className="bg-gray-800 p-6 rounded-lg">
-          <h2 className="text-2xl font-semibold mb-4">Your Published Items</h2>
+        <div className="lg:col-span-2 bg-gray-800 p-6 rounded-lg">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">Your Published Items</h2>
+            <BarChart className="text-gray-500"/>
+          </div>
           {loading ? <p>Loading items...</p> : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
               {items.length === 0 && <p className="text-gray-400">You haven't published any items yet.</p>}
               {items.map(item => (
                 <div key={item.id} className="bg-gray-700 p-3 rounded flex justify-between items-center">
@@ -166,8 +220,14 @@ const CreatorDashboard = () => {
               ))}
             </div>
           )}
+          <div className="mt-6">
+            <h3 className="text-xl font-semibold mb-2">Stats Overview</h3>
+            <div className="p-4 bg-gray-900 rounded-lg">
+               <StatsChart stats={stats} />
+            </div>
+          </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
