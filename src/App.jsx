@@ -24,6 +24,7 @@ import GroupChat from './components/group/GroupChat';
 import LiveStream from './components/stream/LiveStream';
 import VirtualStore from './components/store/VirtualStore';
 import InventoryScreen from './components/store/InventoryScreen';
+import ThreeDRoom from './components/world/ThreeDRoom';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -102,6 +103,7 @@ const AppContent = () => {
           <Route path="/stream/watch/:streamId" element={<LiveStream />} />
           <Route path="/store" element={<VirtualStore />} />
           <Route path="/inventory" element={<InventoryScreen />} />
+          <Route path="/world" element={<ThreeDRoom />} />
         </Route>
 
         {/* Redirect any unknown paths to the home page if logged in, or login if not */}

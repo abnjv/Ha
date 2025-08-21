@@ -73,7 +73,7 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
         <div className="md:col-span-2 space-y-8">
           <div>
             <h2 className="text-2xl font-bold mb-4">{t('metaverse', 'Metaverse Features')}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                <div onClick={() => navigate('/store')} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div><h3 className="font-bold">{t('store', 'Virtual Store')}</h3><p className="text-sm text-gray-400">{t('storeDescription', 'Buy backgrounds and skins.')}</p></div>
                 <button className="p-2 rounded-full bg-blue-600 text-white">Explore</button>
@@ -81,6 +81,10 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
               <div onClick={() => navigate('/inventory')} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 <div><h3 className="font-bold">{t('inventory', 'My Inventory')}</h3><p className="text-sm text-gray-400">{t('inventoryDescription', 'Manage your purchased items.')}</p></div>
                 <button className="p-2 rounded-full bg-green-600 text-white">Manage</button>
+              </div>
+              <div onClick={() => navigate('/world')} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                <div><h3 className="font-bold">{t('world', '3D World')}</h3><p className="text-sm text-gray-400">{t('worldDescription', 'Explore the virtual world.')}</p></div>
+                <button className="p-2 rounded-full bg-purple-600 text-white">Enter</button>
               </div>
             </div>
           </div>
