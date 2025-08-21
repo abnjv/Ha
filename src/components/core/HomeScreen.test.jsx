@@ -59,14 +59,14 @@ describe('HomeScreen Dashboard', () => {
     renderWithProviders(<HomeScreen />);
 
     // Use findBy* to wait for the component to render after async operations
-    expect(await screen.findByRole('heading', { name: /Public Rooms/i })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: /Recent Chats/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /publicRooms/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /recentChats/i })).toBeInTheDocument();
   });
 
   it('renders the browse and all chats buttons', async () => {
     renderWithProviders(<HomeScreen />);
 
-    expect(await screen.findByRole('button', { name: /Browse All Rooms.../i })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /All Chats.../i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /browseAllRooms/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /allChats/i })).toBeInTheDocument();
   });
 });
