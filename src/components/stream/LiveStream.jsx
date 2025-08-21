@@ -37,31 +37,45 @@ const LiveStream = () => {
     if (isBroadcaster) {
       // Logic for broadcaster is handled by button click
     } else {
-      // Logic for watcher
-      socketRef.current.emit('watch-stream', streamId);
+      // --- WATCHER LOGIC ---
+      const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      peersRef.current['broadcaster'] = peer; // There's only one peer connection needed for the watcher
 
-      socketRef.current.on('stream-signal-from-broadcaster', ({ signal }) => {
-        const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        peersRef.current['broadcaster'] = peer;
+      // Handle incoming stream from the broadcaster
+      peer.ontrack = event => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = event.streams[0];
+          setIsLive(true);
+        }
+      };
 
-        peer.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        peer.createAnswer().then(answer => {
-          peer.setLocalDescription(answer);
-          socketRef.current.emit('watcher-signal-to-streamer', { broadcasterId: signal.broadcasterId, signal: { sdp: answer } });
-        });
+      // Handle ICE candidates: send them to the broadcaster via the server
+      peer.onicecandidate = event => {
+        if (event.candidate) {
+          // The server will find the broadcaster based on the streamId
+          socketRef.current.emit('watcher-signal-to-streamer', { streamId, signal: { candidate: event.candidate } });
+        }
+      };
 
-        peer.onicecandidate = event => {
-          if (event.candidate) {
-            socketRef.current.emit('watcher-signal-to-streamer', { broadcasterId: signal.broadcasterId, signal: { candidate: event.candidate } });
+      // This listener handles signals (offer, candidates) from the broadcaster
+      socketRef.current.on('stream-signal-from-broadcaster', async ({ broadcasterId, signal }) => {
+        try {
+          if (signal.sdp) { // This is the offer from the broadcaster
+            await peer.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            const answer = await peer.createAnswer();
+            await peer.setLocalDescription(answer);
+            // Send the answer back to the specific broadcaster
+            socketRef.current.emit('watcher-signal-to-streamer', { broadcasterId, signal: { sdp: answer } });
+          } else if (signal.candidate) { // This is an ICE candidate from the broadcaster
+            await peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
           }
-        };
-
-        peer.ontrack = event => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = event.streams[0];
-          }
-        };
+        } catch (error) {
+          console.error("Error processing signal from broadcaster:", error);
+        }
       });
+
+      // Tell the server we want to watch this stream
+      socketRef.current.emit('watch-stream', streamId);
     }
 
     socketRef.current.on('stream-ended', (endedStreamId) => {
