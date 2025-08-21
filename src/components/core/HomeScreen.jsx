@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio } from 'lucide-react';
+import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy } from 'lucide-react';
 import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
-import { getRoomsPath, getUserFriendsPath, getGroupsPath } from '../../constants';
+import { getRoomsPath, getUserFriendsPath, getGroupsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME } from '../../constants';
 
 const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   const { isDarkMode, toggleDarkMode, themeClasses } = useContext(ThemeContext);
@@ -81,6 +81,7 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
           <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-gray-700"><Sun className="w-6 h-6 text-yellow-500" /></button>
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
+          <button onClick={() => navigate(`/chat/${SUPPORT_BOT_ID}/${SUPPORT_BOT_NAME}`)} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
           <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative"><Bell className="w-6 h-6 text-white" />{hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}</button>
           <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ml-1" /> Logout</button>
         </div>
