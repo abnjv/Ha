@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CornerUpLeft, Send as SendIcon, MoreHorizontal, Edit, Trash2, MessageSquare, X, Paperclip, File as FileIcon } from 'lucide-react';
+import { CornerUpLeft, Send as SendIcon, MoreHorizontal, Edit, Trash2, MessageSquare, X, Paperclip, File as FileIcon, Gamepad2 } from 'lucide-react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
+import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../../context/AuthContext';
 import { getPrivateChatMessagesPath, getPrivateChatsPath } from '../../constants';
 import ProfileModal from '../profile/ProfileModal';
+import TicTacToeBoard from '../game/TicTacToeBoard';
+import { createBoard, calculateWinner } from '../../game/ticTacToe';
 
 const debounce = (func, delay) => { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func(...args), delay); }; };
 
 const PrivateChat = () => {
-  const { user, db, storage, appId } = useAuth();
+  const { user, userProfile, db, storage, appId } = useAuth();
   const navigate = useNavigate();
   const { friendId, friendName } = useParams();
 
@@ -21,61 +24,95 @@ const PrivateChat = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(null); // To store file being uploaded
+  const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingText, setEditingText] = useState('');
   const [showOptionsForMessageId, setShowOptionsForMessageId] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
 
+  const [gameStatus, setGameStatus] = useState('inactive');
+  const [invitation, setInvitation] = useState(null);
+  const [board, setBoard] = useState(createBoard());
+  const [playerSymbol, setPlayerSymbol] = useState(null);
+  const [currentPlayer, setCurrentPlayer] = useState('X');
+  const winner = calculateWinner(board);
+
+  const socketRef = useRef();
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
-
   const chatPartnersId = useMemo(() => user && friendId ? [user.uid, friendId].sort().join('_') : null, [user, friendId]);
+
+  useEffect(() => {
+    socketRef.current = io(import.meta.env.VITE_SIGNALING_SERVER_URL);
+    if (user?.uid) {
+        socketRef.current.emit('register', user.uid);
+    }
+
+    socketRef.current.on('game:invite', ({ from, fromName }) => { setInvitation({ from, fromName }); setGameStatus('pending'); });
+    socketRef.current.on('game:start', ({ opponentName }) => { setGameStatus('active'); setBoard(createBoard()); setCurrentPlayer('X'); setPlayerSymbol('X'); });
+    socketRef.current.on('game:move', ({ board: newBoard }) => { setBoard(newBoard); setCurrentPlayer(prev => prev === 'X' ? 'O' : 'X'); });
+    socketRef.current.on('game:reset', () => { setBoard(createBoard()); setCurrentPlayer('X'); setGameStatus('active'); });
+    socketRef.current.on('game:leave', () => { setGameStatus('ended'); });
+
+    return () => { socketRef.current.disconnect(); };
+  }, [user.uid]);
 
   useEffect(() => { if (!db || !chatPartnersId) return; const q = query(collection(db, getPrivateChatMessagesPath(appId, chatPartnersId)), orderBy('createdAt')); const unsub = onSnapshot(q, (snap) => { setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setIsLoading(false); }); return unsub; }, [db, appId, chatPartnersId]);
   useEffect(() => { if (!db || !chatPartnersId) return; const q = query(collection(db, `${getPrivateChatsPath(appId, chatPartnersId)}/typing_status`)); const unsub = onSnapshot(q, (snap) => { const now = Date.now(); setTypingUsers(snap.docs.filter(d => d.id !== user.uid && (now - d.data().lastTyped.toMillis()) < 3000).map(d => d.data().name)); }); return unsub; }, [db, appId, chatPartnersId, user.uid]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const updateTypingStatus = useCallback(debounce(async () => { if (!db || !chatPartnersId) return; await setDoc(doc(db, `${getPrivateChatsPath(appId, chatPartnersId)}/typing_status`, user.uid), { name: user.displayName, lastTyped: serverTimestamp() }); }, 500), [db, chatPartnersId, user]);
+  const updateTypingStatus = useCallback(debounce(async () => { if (!db || !chatPartnersId) return; await setDoc(doc(db, `${getPrivateChatsPath(appId, chatPartnersId)}/typing_status`, user.uid), { name: userProfile.name, lastTyped: serverTimestamp() }); }, 500), [db, chatPartnersId, userProfile]);
   const handleInputChange = (e) => { setInputMessage(e.target.value); updateTypingStatus(); };
-
-  const sendDbMessage = async (messageData) => {
-    const finalMessage = { ...messageData, senderId: user.uid, createdAt: serverTimestamp(), isEdited: false, replyTo: replyingToMessage ? { id: replyingToMessage.id, text: replyingToMessage.text, senderId: replyingToMessage.senderId, senderName: messages.find(m => m.senderId === replyingToMessage.senderId)?.senderName || 'Unknown' } : null };
-    await addDoc(collection(db, getPrivateChatMessagesPath(appId, chatPartnersId)), finalMessage);
-    setReplyingToMessage(null);
-  };
-
+  const sendDbMessage = async (messageData) => { const finalMessage = { ...messageData, senderId: user.uid, createdAt: serverTimestamp(), isEdited: false, replyTo: replyingToMessage ? { id: replyingToMessage.id, text: replyingToMessage.text, senderId: replyingToMessage.senderId, senderName: messages.find(m => m.senderId === replyingToMessage.senderId)?.senderName || 'Unknown' } : null }; await addDoc(collection(db, getPrivateChatMessagesPath(appId, chatPartnersId)), finalMessage); setReplyingToMessage(null); };
   const handleSendMessage = async (e) => { e.preventDefault(); if (inputMessage.trim() === '' || isSendingMessage) return; setIsSendingMessage(true); await sendDbMessage({ type: 'text', text: inputMessage }); setInputMessage(''); setIsSendingMessage(false); };
   const handleFileChange = (e) => { const file = e.target.files[0]; if (file) uploadFile(file); };
-
-  const uploadFile = (file) => {
-    if (!storage || !chatPartnersId) return;
-    setUploadingFile(file);
-    const storageRef = ref(storage, `chat_uploads/${chatPartnersId}/${Date.now()}_${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-    uploadTask.on('state_changed', (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100), (error) => { console.error("Upload failed:", error); setUploadingFile(null); }, () => {
-      getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-        const fileType = file.type.startsWith('image/') ? 'image' : 'file';
-        sendDbMessage({ type: fileType, file: { url: downloadURL, name: file.name, type: file.type } });
-        setUploadingFile(null);
-        setUploadProgress(0);
-      });
-    });
-  };
-
+  const uploadFile = (file) => { if (!storage || !chatPartnersId) return; setUploadingFile(file); const storageRef = ref(storage, `chat_uploads/${chatPartnersId}/${Date.now()}_${file.name}`); const uploadTask = uploadBytesResumable(storageRef, file); uploadTask.on('state_changed', (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100), (error) => { console.error("Upload failed:", error); setUploadingFile(null); }, () => { getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => { const fileType = file.type.startsWith('image/') ? 'image' : 'file'; sendDbMessage({ type: fileType, file: { url: downloadURL, name: file.name, type: file.type } }); setUploadingFile(null); setUploadProgress(0); }); }); };
   const handleDeleteMessage = async (msgId) => await deleteDoc(doc(db, getPrivateChatMessagesPath(appId, chatPartnersId), msgId));
   const startEditing = (msg) => { setEditingMessageId(msg.id); setEditingText(msg.text); setShowOptionsForMessageId(null); };
   const handleUpdateMessage = async (e) => { e.preventDefault(); if (editingText.trim() === '') return; await updateDoc(doc(db, getPrivateChatMessagesPath(appId, chatPartnersId), editingMessageId), { text: editingText, isEdited: true, editedAt: Timestamp.now() }); setEditingMessageId(null); };
   const startReplying = (msg) => { setReplyingToMessage(msg); setShowOptionsForMessageId(null); };
   const ReplyQuote = ({ msg }) => <div className="p-2 mb-1 text-xs bg-gray-500/30 rounded-lg"><p className="font-bold">{msg.senderName}</p><p className="opacity-80 truncate">{msg.text}</p></div>;
 
+  const handleInviteGame = () => { socketRef.current.emit('game:invite', { targetUserId: friendId, fromUserId: user.uid, fromName: userProfile.name }); setGameStatus('invited'); setPlayerSymbol('X'); };
+  const handleAcceptGame = () => { socketRef.current.emit('game:accept', { targetSocketId: invitation.from }); setGameStatus('active'); setBoard(createBoard()); setCurrentPlayer('X'); setPlayerSymbol('O'); setInvitation(null); };
+  const handleDeclineGame = () => { setInvitation(null); setGameStatus('inactive'); };
+  const handlePlayMove = (index) => { if (board[index] || winner || currentPlayer !== playerSymbol) return; const newBoard = board.slice(); newBoard[index] = playerSymbol; setBoard(newBoard); setCurrentPlayer(playerSymbol === 'X' ? 'O' : 'X'); socketRef.current.emit('game:move', { targetUserId: friendId, board: newBoard }); };
+  const handleResetGame = () => { socketRef.current.emit('game:reset', { targetUserId: friendId }); setBoard(createBoard()); setCurrentPlayer('X'); setGameStatus('active'); };
+  const handleLeaveGame = () => { if (gameStatus === 'active') { socketRef.current.emit('game:leave', { targetUserId: friendId }); } setGameStatus('inactive'); setInvitation(null); };
+
+  const GameOverlay = () => (
+    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20">
+      <div className="text-center p-6 rounded-lg bg-gray-900 shadow-2xl">
+        {gameStatus === 'pending' && invitation && (<div><h2 className="text-xl font-bold mb-4">{invitation.fromName} has invited you to play!</h2><div className="flex justify-center space-x-4"><button onClick={handleAcceptGame} className="px-6 py-2 bg-green-600 rounded">Accept</button><button onClick={handleDeclineGame} className="px-6 py-2 bg-red-600 rounded">Decline</button></div></div>)}
+        {gameStatus === 'invited' && (<h2 className="text-xl font-bold">Waiting for {friendName} to accept...</h2>)}
+        {(gameStatus === 'active' || (gameStatus === 'ended' && winner)) && (
+          <>
+            <h2 className="text-2xl font-bold mb-4">Tic-Tac-Toe</h2>
+            <TicTacToeBoard squares={board} onPlay={handlePlayMove} />
+            <div className="mt-4 text-xl font-bold">
+              {winner ? (winner === 'draw' ? 'It\'s a Draw!' : `Winner: ${winner}`) : `Turn: ${currentPlayer}`}
+            </div>
+            <p className="text-sm text-gray-400">You are: {playerSymbol}</p>
+            <button onClick={handleResetGame} className="mt-4 px-4 py-2 bg-blue-600 rounded">Play Again</button>
+          </>
+        )}
+        {gameStatus === 'ended' && !winner && <h2 className="text-xl font-bold">Your opponent left the game.</h2>}
+        <button onClick={handleLeaveGame} className="mt-4 ml-2 px-4 py-2 bg-gray-700 rounded">Close</button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
-      <header className={`flex items-center space-x-4 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}><button onClick={() => navigate('/private-chat-list')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft/></button><button onClick={() => setIsProfileModalOpen(true)} className="text-2xl font-extrabold flex-1 text-left hover:underline">{friendName}</button></header>
+    <div className={`relative flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
+      {(gameStatus !== 'inactive') && <GameOverlay />}
+      <header className={`flex items-center space-x-2 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        <button onClick={() => navigate('/private-chat-list')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft/></button>
+        <button onClick={() => setIsProfileModalOpen(true)} className="text-2xl font-extrabold flex-1 text-left hover:underline">{friendName}</button>
+        <button onClick={handleInviteGame} title="Play Tic-Tac-Toe" className="p-2 rounded-full hover:bg-gray-700"><Gamepad2 className="w-6 h-6 text-purple-500" /></button>
+      </header>
       <div className={`flex-1 flex flex-col p-4 rounded-3xl shadow-xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="flex-1 overflow-y-auto mb-4 p-4 space-y-4 custom-scrollbar">
           {isLoading ? <div className="flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-dashed rounded-full animate-spin border-blue-500"></div></div> : (
