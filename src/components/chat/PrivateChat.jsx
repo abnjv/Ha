@@ -7,9 +7,11 @@ import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../../context/AuthContext';
-import { getPrivateChatMessagesPath, getPrivateChatsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME, SUPPORT_BOT_AVATAR } from '../../constants';
+import { getPrivateChatMessagesPath, getPrivateChatsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME, SUPPORT_BOT_AVATAR, getUserProfilePath } from '../../constants';
 import { getBotResponse } from '../../bot/supportBot';
 import ProfileModal from '../profile/ProfileModal';
+import { get as getKey } from '../../utils/db';
+import { importPublicKey, deriveSharedSecret, encryptMessage, decryptMessage, arrayBufferToBase64, base64ToArrayBuffer } from '../../utils/encryption';
 import TicTacToeBoard from '../game/TicTacToeBoard';
 import { createBoard, calculateWinner } from '../../game/ticTacToe';
 
@@ -32,6 +34,7 @@ const PrivateChat = () => {
   const [showOptionsForMessageId, setShowOptionsForMessageId] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [typingUsers, setTypingUsers] = useState([]);
+  const [sharedSecretKey, setSharedSecretKey] = useState(null);
 
   const [gameStatus, setGameStatus] = useState('inactive');
   const [invitation, setInvitation] = useState(null);
@@ -65,6 +68,35 @@ const PrivateChat = () => {
   }, [user.uid, isChatWithBot]);
 
   useEffect(() => {
+    const setupEncryption = async () => {
+      if (isChatWithBot || !user) return;
+      try {
+        // 1. Get current user's private key from IndexedDB
+        const privateKey = await getKey(`ecdh_private_key_${user.uid}`);
+        if (!privateKey) throw new Error("Private key not found.");
+
+        // 2. Get friend's public key from Firestore
+        const friendDocRef = doc(db, getUserProfilePath(appId, friendId));
+        const friendDoc = await getDoc(friendDocRef);
+        if (!friendDoc.exists() || !friendDoc.data().publicKey) {
+          throw new Error("Friend's public key not found.");
+        }
+        const friendPublicKeyJwk = friendDoc.data().publicKey;
+        const friendPublicKey = await importPublicKey(friendPublicKeyJwk);
+
+        // 3. Derive shared secret
+        const secret = await deriveSharedSecret(privateKey, friendPublicKey);
+        setSharedSecretKey(secret);
+        console.log("E2EE session established.");
+      } catch (error) {
+        console.error("Encryption setup failed:", error);
+        // Handle error, maybe show a warning to the user
+      }
+    };
+    setupEncryption();
+  }, [user, friendId, db, appId, isChatWithBot]);
+
+  useEffect(() => {
     if (isChatWithBot || !db || !chatPartnersId) {
       if (!isChatWithBot) setIsLoading(false);
       return;
@@ -91,18 +123,35 @@ const PrivateChat = () => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (inputMessage.trim() === '') return;
-    const userMessage = { id: `user-${Date.now()}`, senderId: user.uid, text: inputMessage, createdAt: { toDate: () => new Date() } };
+    setIsSendingMessage(true);
+
     if (isChatWithBot) {
+      const userMessage = { id: `user-${Date.now()}`, senderId: user.uid, text: inputMessage, createdAt: { toDate: () => new Date() } };
       setMessages(prev => [...prev, userMessage]);
       const botResponseText = getBotResponse(inputMessage);
       const botMessage = { id: `bot-${Date.now()}`, senderId: SUPPORT_BOT_ID, text: botResponseText, createdAt: { toDate: () => new Date() } };
       setTimeout(() => setMessages(prev => [...prev, botMessage]), 500);
     } else {
-      setIsSendingMessage(true);
-      await sendDbMessage({ type: 'text', text: inputMessage });
-      setIsSendingMessage(false);
+      if (!sharedSecretKey) {
+        alert("Encryption keys are not ready. Please wait a moment and try again.");
+        setIsSendingMessage(false);
+        return;
+      }
+      try {
+        const { encryptedData, iv } = await encryptMessage(inputMessage, sharedSecretKey);
+        const messagePayload = {
+          ct: arrayBufferToBase64(encryptedData),
+          iv: arrayBufferToBase64(iv),
+        };
+        await sendDbMessage({ type: 'encrypted_text', content: messagePayload });
+      } catch (error) {
+        console.error("Failed to encrypt and send message:", error);
+        alert("Failed to send encrypted message.");
+      }
     }
+
     setInputMessage('');
+    setIsSendingMessage(false);
   };
 
   const handleFileChange = (e) => { const file = e.target.files[0]; if (file) uploadFile(file); };
@@ -112,6 +161,32 @@ const PrivateChat = () => {
   const handleUpdateMessage = async (e) => { e.preventDefault(); if (editingText.trim() === '') return; await updateDoc(doc(db, getPrivateChatMessagesPath(appId, chatPartnersId), editingMessageId), { text: editingText, isEdited: true, editedAt: Timestamp.now() }); setEditingMessageId(null); };
   const startReplying = (msg) => { setReplyingToMessage(msg); setShowOptionsForMessageId(null); };
   const ReplyQuote = ({ msg }) => <div className="p-2 mb-1 text-xs bg-gray-500/30 rounded-lg"><p className="font-bold">{msg.senderName}</p><p className="opacity-80 truncate">{msg.text}</p></div>;
+
+  const DecryptedMessage = ({ message }) => {
+    const [decryptedText, setDecryptedText] = useState('...');
+
+    useEffect(() => {
+      const decrypt = async () => {
+        if (message.type === 'encrypted_text' && message.content && sharedSecretKey) {
+          try {
+            const encryptedData = base64ToArrayBuffer(message.content.ct);
+            const iv = base64ToArrayBuffer(message.content.iv);
+            const decrypted = await decryptMessage(encryptedData, iv, sharedSecretKey);
+            setDecryptedText(decrypted);
+          } catch (e) {
+            console.error("Decryption failed:", e);
+            setDecryptedText('[Decryption Error]');
+          }
+        } else {
+            setDecryptedText(message.text); // For non-encrypted or old messages
+        }
+      };
+      decrypt();
+    }, [message, sharedSecretKey]);
+
+    return <p>{decryptedText}</p>;
+  };
+
   const handleInviteGame = () => { socketRef.current.emit('game:invite', { targetUserId: friendId, fromUserId: user.uid, fromName: userProfile.name }); setGameStatus('invited'); setPlayerSymbol('X'); };
   const handleAcceptGame = () => { socketRef.current.emit('game:accept', { targetSocketId: invitation.from }); setGameStatus('active'); setBoard(createBoard()); setCurrentPlayer('X'); setPlayerSymbol('O'); setInvitation(null); };
   const handleDeclineGame = () => { setInvitation(null); setGameStatus('inactive'); };
@@ -142,7 +217,7 @@ const PrivateChat = () => {
       <div className={`flex-1 flex flex-col p-4 rounded-3xl shadow-xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <div className="flex-1 overflow-y-auto mb-4 p-4 space-y-4 custom-scrollbar">
           {isLoading ? <div className="flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-dashed rounded-full animate-spin border-blue-500"></div></div> : (
-            <TransitionGroup>{messages.map((message) => <CSSTransition key={message.id} timeout={300} classNames="message-item"><div className={`message-item group flex relative ${message.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>{!isChatWithBot && message.senderId === user.uid && (<div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100"><button onClick={() => setShowOptionsForMessageId(showOptionsForMessageId === message.id ? null : message.id)} className="p-1 rounded-full hover:bg-gray-700"><MoreHorizontal size={16} /></button>{showOptionsForMessageId === message.id && (<div className="absolute rtl:right-full ltr:left-full ms-2 w-28 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 py-1"><button onClick={() => startReplying(message)} className="w-full text-start text-sm px-3 py-1.5 hover:bg-gray-700 flex items-center"><MessageSquare size={14} className="me-2"/> Reply</button><button onClick={() => startEditing(message)} className="w-full text-start text-sm px-3 py-1.5 hover:bg-gray-700 flex items-center"><Edit size={14} className="me-2"/> Edit</button><button onClick={() => handleDeleteMessage(message.id)} className="w-full text-start text-sm px-3 py-1.5 text-red-500 hover:bg-gray-700 flex items-center"><Trash2 size={14} className="me-2"/> Delete</button></div>)}</div>)}<div className={`max-w-xs md:max-w-md p-3 rounded-xl shadow-md ${message.senderId === user.uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}>{!isChatWithBot && message.replyTo && <ReplyQuote msg={message.replyTo} />}{editingMessageId === message.id ? (<form onSubmit={handleUpdateMessage}><input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-blue-700 text-white rounded p-1" autoFocus/><div className="flex justify-end space-x-2 mt-2"><button type="button" onClick={() => setEditingMessageId(null)} className="text-xs">Cancel</button><button type="submit" className="text-xs font-bold">Save</button></div></form>) : (message.type === 'image' ? <img src={message.file.url} alt={message.file.name} className="rounded-lg max-w-full h-auto" /> : message.type === 'file' ? <a href={message.file.url} target="_blank" rel="noopener noreferrer" className="flex items-center underline"><FileIcon className="me-2"/>{message.file.name}</a> : <p>{message.text}</p>)}<span className={`block mt-1 text-xs ${message.senderId === user.uid ? 'text-blue-200' : 'text-gray-500'}`}>{message.createdAt?.seconds ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString('ar-SA') : ''} {!isChatWithBot && message.isEdited && <i>(edited)</i>}</span></div></div></CSSTransition>)}</TransitionGroup>)}
+            <TransitionGroup>{messages.map((message) => <CSSTransition key={message.id} timeout={300} classNames="message-item"><div className={`message-item group flex relative ${message.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>{!isChatWithBot && message.senderId === user.uid && (<div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100"><button onClick={() => setShowOptionsForMessageId(showOptionsForMessageId === message.id ? null : message.id)} className="p-1 rounded-full hover:bg-gray-700"><MoreHorizontal size={16} /></button>{showOptionsForMessageId === message.id && (<div className="absolute rtl:right-full ltr:left-full ms-2 w-28 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 py-1"><button onClick={() => startReplying(message)} className="w-full text-start text-sm px-3 py-1.5 hover:bg-gray-700 flex items-center"><MessageSquare size={14} className="me-2"/> Reply</button><button onClick={() => startEditing(message)} className="w-full text-start text-sm px-3 py-1.5 hover:bg-gray-700 flex items-center"><Edit size={14} className="me-2"/> Edit</button><button onClick={() => handleDeleteMessage(message.id)} className="w-full text-start text-sm px-3 py-1.5 text-red-500 hover:bg-gray-700 flex items-center"><Trash2 size={14} className="me-2"/> Delete</button></div>)}</div>)}<div className={`max-w-xs md:max-w-md p-3 rounded-xl shadow-md ${message.senderId === user.uid ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-900'}`}>{!isChatWithBot && message.replyTo && <ReplyQuote msg={message.replyTo} />}{editingMessageId === message.id ? (<form onSubmit={handleUpdateMessage}><input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-blue-700 text-white rounded p-1" autoFocus/><div className="flex justify-end space-x-2 mt-2"><button type="button" onClick={() => setEditingMessageId(null)} className="text-xs">Cancel</button><button type="submit" className="text-xs font-bold">Save</button></div></form>) : (message.type === 'image' ? <img src={message.file.url} alt={message.file.name} className="rounded-lg max-w-full h-auto" /> : message.type === 'file' ? <a href={message.file.url} target="_blank" rel="noopener noreferrer" className="flex items-center underline"><FileIcon className="me-2"/>{message.file.name}</a> : <DecryptedMessage message={message} />)}<span className={`block mt-1 text-xs ${message.senderId === user.uid ? 'text-blue-200' : 'text-gray-500'}`}>{message.createdAt?.seconds ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString('ar-SA') : ''} {!isChatWithBot && message.isEdited && <i>(edited)</i>}</span></div></div></CSSTransition>)}</TransitionGroup>)}
           <div ref={messagesEndRef} />
         </div>
         {!isChatWithBot && <div className="h-5 text-sm text-gray-400 italic">{typingUsers.length > 0 && `${typingUsers.join(', ')} is typing...`}</div>}
