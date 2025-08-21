@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, Users, User as UserIcon, Home, Bell, Sun } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { getRoomsPath, getUserFriendsPath } from '../../constants';
+import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
+import { getRoomsPath, getUserFriendsPath, getGroupsPath } from '../../constants';
 
 const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   const { isDarkMode, toggleDarkMode, themeClasses } = useContext(ThemeContext);
@@ -13,9 +13,10 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
 
   const [rooms, setRooms] = useState([]);
   const [friends, setFriends] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [groups, setGroups] = useState([]);
+  const [isLoading, setIsLoading] =useState(true);
 
-  // Fetch a few public rooms
+  // Fetch public rooms
   useEffect(() => {
     if (!db) return;
     const roomsQuery = query(collection(db, getRoomsPath(appId)), orderBy('createdAt', 'desc'), limit(5));
@@ -29,12 +30,24 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   // Fetch friends for recent chats
   useEffect(() => {
     if (!db || !user?.uid) return;
-    const friendsQuery = query(collection(db, getUserFriendsPath(appId, user.uid)), limit(10));
+    const friendsQuery = query(collection(db, getUserFriendsPath(appId, user.uid)), limit(5));
     const unsubscribeFriends = onSnapshot(friendsQuery, (snapshot) => {
       setFriends(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsubscribeFriends();
   }, [db, appId, user]);
+
+  // Fetch user's groups
+  useEffect(() => {
+    if (!db || !user?.uid) return;
+    // This query finds groups where the user's ID exists as a key in the 'members' map.
+    const groupsQuery = query(collection(db, getGroupsPath(appId)), where(`members.${user.uid}`, '!=', null));
+    const unsubscribeGroups = onSnapshot(groupsQuery, (snapshot) => {
+      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribeGroups();
+  }, [db, appId, user]);
+
 
   const handleLogout = async () => {
     try {
@@ -70,10 +83,7 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
             <div className="space-y-4">
               {rooms.map(room => (
                 <div key={room.id} onClick={() => navigate(`/room/${room.id}/${room.roomType || 'large_hall'}`)} className={`p-4 rounded-xl shadow-md flex items-center justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                  <div>
-                    <h3 className="font-bold">{room.title}</h3>
-                    <p className="text-sm text-gray-400">{room.description}</p>
-                  </div>
+                  <div><h3 className="font-bold">{room.title}</h3><p className="text-sm text-gray-400">{room.description}</p></div>
                   <button className="p-2 rounded-full bg-green-600 text-white">Join</button>
                 </div>
               ))}
@@ -81,19 +91,35 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
             </div>
           )}
         </div>
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Recent Chats</h2>
-          {isLoading ? <p>Loading...</p> : (
-            <div className="space-y-3">
-              {friends.map(friend => (
-                <div key={friend.id} onClick={() => navigate(`/chat/${friend.id}/${friend.name}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
-                  <img src={friend.avatar} alt={friend.name} className="w-10 h-10 rounded-full" />
-                  <span className="font-semibold">{friend.name}</span>
-                </div>
-              ))}
-              <button onClick={() => navigate('/private-chat-list')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">All Chats...</button>
-            </div>
-          )}
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-4">My Groups</h2>
+            {isLoading ? <p>Loading...</p> : (
+              <div className="space-y-3">
+                {groups.map(group => (
+                  <div key={group.id} onClick={() => navigate(`/group-chat/${group.id}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                    <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white">{group.name.charAt(0)}</div>
+                    <span className="font-semibold">{group.name}</span>
+                  </div>
+                ))}
+                 <button onClick={() => navigate('/create-group')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">Create a New Group...</button>
+              </div>
+            )}
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Recent Chats</h2>
+            {isLoading ? <p>Loading...</p> : (
+              <div className="space-y-3">
+                {friends.map(friend => (
+                  <div key={friend.id} onClick={() => navigate(`/chat/${friend.id}/${friend.name}`)} className={`p-3 rounded-xl flex items-center space-x-3 cursor-pointer transition-all hover:bg-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                    <img src={friend.avatar} alt={friend.name} className="w-10 h-10 rounded-full" />
+                    <span className="font-semibold">{friend.name}</span>
+                  </div>
+                ))}
+                <button onClick={() => navigate('/private-chat-list')} className="w-full mt-4 p-3 rounded-xl bg-gray-700 hover:bg-gray-600">All Chats...</button>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
