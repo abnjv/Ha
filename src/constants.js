@@ -21,6 +21,11 @@ export const getPrivateChatMessagesPath = (appId, chatPartnersId) => `${getPriva
 
 export const getFriendRequestsPath = (appId) => `${getPublicDataPath(appId)}/friend_requests`;
 
+// --- Group Paths ---
+export const getGroupsPath = (appId) => `${getPublicDataPath(appId)}/groups`;
+export const getGroupPath = (appId, groupId) => `${getGroupsPath(appId)}/${groupId}`;
+export const getGroupMessagesPath = (appId, groupId) => `${getGroupPath(appId, groupId)}/messages`;
+
 
 // --- User-Specific Data Paths ---
 const getUsersPath = (appId) => `${getArtifactsPath(appId)}/users`;

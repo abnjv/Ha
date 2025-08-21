@@ -19,6 +19,8 @@ import PrivateChat from './components/chat/PrivateChat';
 import FriendList from './components/profile/FriendList';
 import AddFriendScreen from './components/profile/AddFriendScreen';
 import UserProfileScreen from './components/profile/UserProfileScreen';
+import CreateGroupScreen from './components/group/CreateGroupScreen';
+import GroupChat from './components/group/GroupChat';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -91,6 +93,8 @@ const AppContent = () => {
           <Route path="/friends" element={<FriendList />} />
           <Route path="/add-friend" element={<AddFriendScreen />} />
           <Route path="/profile" element={<UserProfileScreen />} />
+          <Route path="/create-group" element={<CreateGroupScreen />} />
+          <Route path="/group-chat/:groupId" element={<GroupChat />} />
         </Route>
 
         {/* Redirect any unknown paths to the home page if logged in, or login if not */}

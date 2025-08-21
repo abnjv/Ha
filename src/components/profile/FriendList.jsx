@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CornerUpLeft, UserPlus, UserMinus, Check, X } from 'lucide-react';
+import { CornerUpLeft, UserPlus, UserMinus, Check, X, Users } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, onSnapshot, deleteDoc, doc, where, getDocs, setDoc, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
@@ -111,9 +111,14 @@ const FriendList = () => {
           <CornerUpLeft className="w-6 h-6" />
         </button>
         <span className="text-2xl font-extrabold flex-1">الأصدقاء</span>
-        <button onClick={() => navigate('/add-friend')} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
-          <UserPlus className="w-6 h-6 text-white" />
-        </button>
+        <div className="flex items-center space-x-2">
+            <button onClick={() => navigate('/create-group')} title="Create Group" className="p-2 rounded-full bg-green-600 hover:bg-green-700 transition-colors duration-200">
+                <Users className="w-6 h-6 text-white" />
+            </button>
+            <button onClick={() => navigate('/add-friend')} title="Add Friend" className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
+                <UserPlus className="w-6 h-6 text-white" />
+            </button>
+        </div>
       </header>
       <div className="flex-1 p-8">
         {friendRequests.length > 0 && (
