@@ -28,6 +28,7 @@ import ThreeDRoom from './components/world/ThreeDRoom';
 import MyRecordings from './components/recordings/MyRecordings';
 import CreatorDashboard from './components/creator/CreatorDashboard';
 import SubscriptionPlans from './components/creator/SubscriptionPlans';
+import GameLobby from './components/game/GameLobby';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -110,6 +111,7 @@ const AppContent = () => {
           <Route path="/my-recordings" element={<MyRecordings />} />
           <Route path="/creator/dashboard" element={<CreatorDashboard />} />
           <Route path="/subscriptions" element={<SubscriptionPlans />} />
+          <Route path="/game/lobby" element={<GameLobby />} />
         </Route>
 
         {/* Redirect any unknown paths to the home page if logged in, or login if not */}
