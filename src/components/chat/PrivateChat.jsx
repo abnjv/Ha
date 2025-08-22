@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CornerUpLeft, Send as SendIcon, MoreHorizontal, Edit, Trash2, MessageSquare, X, Paperclip, File as FileIcon, Gamepad2 } from 'lucide-react';
+import { CornerUpLeft, Send as SendIcon, MoreHorizontal, Edit, Trash2, MessageSquare, X, Paperclip, File as FileIcon, Gamepad2, Languages } from 'lucide-react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
@@ -11,6 +11,7 @@ import { getBotResponse } from '../../bot/supportBot';
 import ProfileModal from '../profile/ProfileModal';
 import { get as getKey } from '../../utils/db';
 import { importPublicKey, deriveSharedSecret, encryptMessage, decryptMessage, arrayBufferToBase64, base64ToArrayBuffer } from '../../utils/encryption';
+import { translate } from '../../utils/translation';
 
 const debounce = (func, delay) => { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func(...args), delay); }; };
 
@@ -33,6 +34,8 @@ const PrivateChat = () => {
   const [typingUsers, setTypingUsers] = useState([]);
   const [sharedSecretKey, setSharedSecretKey] = useState(null);
   const [isBotTyping, setIsBotTyping] = useState(false);
+  const [isTranslationEnabled, setIsTranslationEnabled] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState('en');
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -106,14 +109,46 @@ const PrivateChat = () => {
         return;
       }
       try {
-        const { encryptedData, iv } = await encryptMessage(inputMessage, sharedSecretKey);
+        const messageText = inputMessage;
+        let translatedText = null;
+
+        if (isTranslationEnabled) {
+          try {
+            translatedText = await translate(messageText, targetLanguage);
+          } catch (e) {
+            console.error("Translation failed, sending original message only.", e);
+          }
+        }
+
+        const { encryptedData, iv } = await encryptMessage(messageText, sharedSecretKey);
         const messagePayload = {
           ct: arrayBufferToBase64(encryptedData),
           iv: arrayBufferToBase64(iv),
         };
-        await addDoc(collection(db, getPrivateChatMessagesPath(appId, chatPartnersId)), { type: 'encrypted_text', content: messagePayload, senderId: user.uid, createdAt: serverTimestamp() });
+
+        const docToSend = {
+            type: 'encrypted_text',
+            content: messagePayload,
+            senderId: user.uid,
+            createdAt: serverTimestamp(),
+            // A simple guess of the user's language from browser settings
+            originalLanguage: navigator.language ? navigator.language.split('-')[0] : 'en',
+        };
+
+        if (translatedText) {
+            const { encryptedData: translatedEncryptedData, iv: translatedIv } = await encryptMessage(translatedText, sharedSecretKey);
+            docToSend.translation = {
+                targetLanguage: targetLanguage,
+                content: {
+                    ct: arrayBufferToBase64(translatedEncryptedData),
+                    iv: arrayBufferToBase64(translatedIv)
+                }
+            };
+        }
+
+        await addDoc(collection(db, getPrivateChatMessagesPath(appId, chatPartnersId)), docToSend);
       } catch (error) {
-        console.error("Failed to send encrypted message:", error);
+        console.error("Failed to send message:", error);
       }
     }
 
@@ -134,23 +169,60 @@ const PrivateChat = () => {
   const startReplying = (msg) => { /* ... */ };
 
 
-  const DecryptedMessage = ({ message }) => {
-    // ... (decryption component remains the same)
+  const DecryptedMessage = ({ message, isMyMessage }) => {
     const [decryptedText, setDecryptedText] = useState('...');
+    const [decryptedTranslation, setDecryptedTranslation] = useState(null);
+    const [showOriginal, setShowOriginal] = useState(false);
+
+    const hasTranslation = message.translation && message.translation.content;
+    // Show translation if it's enabled, it's not my message, and a translation exists.
+    const shouldTranslate = isTranslationEnabled && !isMyMessage && hasTranslation;
+
     useEffect(() => {
         const decrypt = async () => {
-            if (message.type === 'encrypted_text' && message.content && sharedSecretKey) {
-                try {
-                    const encryptedData = base64ToArrayBuffer(message.content.ct);
-                    const iv = base64ToArrayBuffer(message.content.iv);
-                    const decrypted = await decryptMessage(encryptedData, iv, sharedSecretKey);
-                    setDecryptedText(decrypted);
-                } catch (e) { setDecryptedText('[Decryption Error]'); }
-            } else { setDecryptedText(message.text); }
+            if (!sharedSecretKey || !message.content) {
+                setDecryptedText('[Encryption key missing]');
+                return;
+            }
+
+            try {
+                // Always decrypt the original message
+                const originalEncrypted = base64ToArrayBuffer(message.content.ct);
+                const originalIv = base64ToArrayBuffer(message.content.iv);
+                const originalDecrypted = await decryptMessage(originalEncrypted, originalIv, sharedSecretKey);
+                setDecryptedText(originalDecrypted);
+
+                // Decrypt translation if it exists
+                if (hasTranslation) {
+                    const translatedEncrypted = base64ToArrayBuffer(message.translation.content.ct);
+                    const translatedIv = base64ToArrayBuffer(message.translation.content.iv);
+                    const translationDecrypted = await decryptMessage(translatedEncrypted, translatedIv, sharedSecretKey);
+                    setDecryptedTranslation(translationDecrypted);
+                } else {
+                    setDecryptedTranslation(null);
+                }
+            } catch (e) {
+                console.error("Decryption failed:", e);
+                setDecryptedText('[Decryption Error]');
+                setDecryptedTranslation(null);
+            }
         };
         decrypt();
-    }, [message, sharedSecretKey]);
-    return <p>{decryptedText}</p>;
+    }, [message, sharedSecretKey, hasTranslation]);
+
+    const displayText = shouldTranslate && !showOriginal && decryptedTranslation ? decryptedTranslation : decryptedText;
+    const canToggle = shouldTranslate && decryptedTranslation;
+
+    return (
+      <div>
+        <p>{displayText}</p>
+        {canToggle && (
+          <button onClick={() => setShowOriginal(prev => !prev)} className="text-xs opacity-70 hover:opacity-100 mt-1 cursor-pointer underline">
+            {showOriginal ? `Show Translation` : 'Show Original'}
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -158,7 +230,30 @@ const PrivateChat = () => {
       <header className={`flex items-center space-x-2 p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
         <button onClick={() => navigate('/private-chat-list')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft/></button>
         <button onClick={() => !isChatWithBot && setIsProfileModalOpen(true)} className="text-2xl font-extrabold flex-1 text-start hover:underline" disabled={isChatWithBot}>{friendName}</button>
-        {!isChatWithBot && (<button onClick={handleInviteGame} title="Play Tic-Tac-Toe" className="p-2 rounded-full hover:bg-gray-700"><Gamepad2 className="w-6 h-6 text-purple-500" /></button>)}
+
+        {!isChatWithBot && (
+          <div className="flex items-center space-x-2">
+            <button onClick={() => setIsTranslationEnabled(prev => !prev)} title="Toggle Translation" className={`p-2 rounded-full hover:bg-gray-700 ${isTranslationEnabled ? 'bg-blue-600 text-white' : ''}`}>
+              <Languages className="w-6 h-6" />
+            </button>
+            {isTranslationEnabled && (
+              <select
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+                className="bg-gray-700 text-white rounded-md p-1 text-sm"
+              >
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="ar">العربية</option>
+                <option value="zh">中文</option>
+                <option value="ja">日本語</option>
+              </select>
+            )}
+            <button onClick={handleInviteGame} title="Play Tic-Tac-Toe" className="p-2 rounded-full hover:bg-gray-700"><Gamepad2 className="w-6 h-6 text-purple-500" /></button>
+          </div>
+        )}
       </header>
       {/* ... (rest of the chat JSX remains largely the same, without the GameOverlay) ... */}
        <div className={`flex-1 flex flex-col p-4 rounded-3xl shadow-xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>

@@ -129,7 +129,7 @@ const SubscriptionPlans = () => {
             >
               {isProcessing ? 'Processing...' : plan.buttonText}
             </motion.button>
-          </div>
+          </motion.div>
         ))}
       </motion.div>
     </div>
