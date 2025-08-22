@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy, Clapperboard, LayoutDashboard, Crown } from 'lucide-react';
+import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy } from 'lucide-react';
 import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +11,7 @@ import { getRoomsPath, getUserFriendsPath, getGroupsPath, SUPPORT_BOT_ID, SUPPOR
 const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode, themeClasses } = useContext(ThemeContext);
-  const { user, userProfile, logout, db, appId } = useAuth();
+  const { user, logout, db, appId } = useAuth();
   const navigate = useNavigate();
 
   const [rooms, setRooms] = useState([]);
@@ -63,13 +63,6 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
           <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-gray-700"><Sun className="w-6 h-6 text-yellow-500" /></button>
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
-          <button onClick={() => navigate('/my-recordings')} className="p-2 rounded-full hover:bg-gray-700" title="My Recordings"><Clapperboard className="w-6 h-6 text-purple-500" /></button>
-          <button onClick={() => navigate('/subscriptions')} className="p-2 rounded-full hover:bg-gray-700" title="Subscriptions"><Crown className="w-6 h-6 text-yellow-400" /></button>
-          {userProfile?.isCreator && (
-            <button onClick={() => navigate('/creator/dashboard')} className="p-2 rounded-full hover:bg-gray-700" title="Creator Dashboard">
-              <LayoutDashboard className="w-6 h-6 text-cyan-500" />
-            </button>
-          )}
           <button onClick={() => navigate(`/chat/${SUPPORT_BOT_ID}/${SUPPORT_BOT_NAME}`)} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
           <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative"><Bell className="w-6 h-6 text-white" />{hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}</button>
           <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ms-1" /> Logout</button>
@@ -78,27 +71,6 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
 
       <main className="flex-1 p-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-8">
-          <div>
-            <h2 className="text-2xl font-bold mb-4">{t('metaverse', 'Metaverse Features')}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-               <div onClick={() => navigate('/store')} className={`p-4 rounded-xl shadow-md flex flex-col justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div><h3 className="font-bold">{t('store', 'Virtual Store')}</h3><p className="text-sm text-gray-400">{t('storeDescription', 'Buy backgrounds and skins.')}</p></div>
-                <button className="w-full mt-4 p-2 rounded-lg bg-blue-600 text-white">Explore</button>
-              </div>
-              <div onClick={() => navigate('/inventory')} className={`p-4 rounded-xl shadow-md flex flex-col justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div><h3 className="font-bold">{t('inventory', 'My Inventory')}</h3><p className="text-sm text-gray-400">{t('inventoryDescription', 'Manage your purchased items.')}</p></div>
-                <button className="w-full mt-4 p-2 rounded-lg bg-green-600 text-white">Manage</button>
-              </div>
-              <div onClick={() => navigate('/world')} className={`p-4 rounded-xl shadow-md flex flex-col justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div><h3 className="font-bold">{t('world', '3D World')}</h3><p className="text-sm text-gray-400">{t('worldDescription', 'Explore the virtual world.')}</p></div>
-                <button className="w-full mt-4 p-2 rounded-lg bg-purple-600 text-white">Enter</button>
-              </div>
-              <div onClick={() => navigate('/game/lobby')} className={`p-4 rounded-xl shadow-md flex flex-col justify-between cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                <div><h3 className="font-bold">{t('games', 'Game Lobby')}</h3><p className="text-sm text-gray-400">{t('gamesDescription', 'Play games with friends.')}</p></div>
-                <button className="w-full mt-4 p-2 rounded-lg bg-red-600 text-white">Play</button>
-              </div>
-            </div>
-          </div>
           <div>
             <h2 className="text-2xl font-bold mb-4">{t('liveStreams', 'Live Streams')}</h2>
             {activeStreams.length > 0 ? (

@@ -1,24 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-
-// Mock react-i18next
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key) => key,
-    i18n: {
-      changeLanguage: vi.fn(),
-    },
-  }),
-}));
-
-// Mock socket.io-client
-vi.mock('socket.io-client', () => ({
-  default: vi.fn(() => ({
-    on: vi.fn(),
-    disconnect: vi.fn(),
-  })),
-}));
 import { AuthProvider } from '../../context/AuthContext';
 import { ThemeProvider } from '../../context/ThemeProvider';
 import HomeScreen from './HomeScreen';
@@ -40,21 +22,20 @@ vi.mock('firebase/firestore', async () => {
   };
 });
 
-// Mock the entire AuthContext module
+// Mock AuthContext
 vi.mock('../../context/AuthContext', async () => {
-  const React = await import('react');
-  const AuthContext = React.createContext();
+  const actual = await vi.importActual('../../context/AuthContext');
   return {
-    AuthProvider: ({ children }) => <>{children}</>, // A dummy provider that does nothing
+    ...actual,
     useAuth: () => ({
       user: { uid: 'test-user-id', displayName: 'Test User' },
       logout: vi.fn(),
-      db: {},
+      db: {}, // This is now safe because firestore functions are mocked
       appId: 'test-app-id',
     }),
-    AuthContext,
   };
 });
+
 
 const renderWithProviders = (ui) => {
   return render(
@@ -79,7 +60,6 @@ describe('HomeScreen Dashboard', () => {
 
     // Use findBy* to wait for the component to render after async operations
     expect(await screen.findByRole('heading', { name: /publicRooms/i })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: /Metaverse Features/i })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: /recentChats/i })).toBeInTheDocument();
   });
 

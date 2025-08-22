@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
-const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,83 +16,84 @@ const PORT = process.env.PORT || 3001;
 // State management
 const rooms = {}; // For group video calls
 const streams = {}; // For live streams
-const gameRooms = {}; // For game rooms
 const users = {}; // Maps userId to socketId for direct messaging
-const ASSISTANT_BOT_ID = 'ai-assistant-jules';
-
-
-function getOtherPlayer(room, currentPlayerSocketId) {
-    if (!room || !room.players) return null;
-    return room.players.find(p => p.socketId !== currentPlayerSocketId);
-}
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   socket.on('register', (userId) => {
     users[userId] = socket.id;
+    console.log(`User ${userId} registered with socket ${socket.id}`);
   });
 
   // --- Group Video Call Logic ---
-  socket.on('join-room', (roomId, userId, userName) => {
+  socket.on('join-room', (roomId, userId) => {
     socket.join(roomId);
-    if (!rooms[roomId]) {
-      rooms[roomId] = {
-        [ASSISTANT_BOT_ID]: { name: 'Jules Assistant', type: 'bot' }
-      };
-    }
-    rooms[roomId][userId] = { name: userName, type: 'user', socketId: socket.id };
-
-    // Let the new user know about everyone already in the room
-    socket.emit('room-state', rooms[roomId]);
-    // Let everyone else know about the new user
-    socket.to(roomId).emit('user-joined', userId, socket.id, userName);
+    if (!rooms[roomId]) { rooms[roomId] = {}; }
+    rooms[roomId][userId] = socket.id;
+    console.log(`User ${userId} (${socket.id}) joined room ${roomId}`);
+    socket.to(roomId).emit('user-joined', userId, socket.id);
+    io.in(roomId).emit('room-state', rooms[roomId]);
   });
 
   socket.on('webrtc-offer', (data) => { io.to(data.targetSocketId).emit('webrtc-offer', { senderSocketId: socket.id, sdp: data.sdp }); });
   socket.on('webrtc-answer', (data) => { io.to(data.targetSocketId).emit('webrtc-answer', { senderSocketId: socket.id, sdp: data.sdp }); });
   socket.on('webrtc-ice-candidate', (data) => { io.to(data.targetSocketId).emit('webrtc-ice-candidate', { senderSocketId: socket.id, candidate: data.candidate }); });
 
-
-  // --- Game Room Logic ---
-  socket.on('game:get-rooms', () => {
-    const availableRooms = Object.values(gameRooms).filter(r => r.players.length < 2);
-    socket.emit('game:rooms-list', availableRooms);
+  // --- Live Streaming Logic ---
+  socket.on('start-stream', (streamId) => {
+    console.log(`User ${socket.id} is starting stream ${streamId}`);
+    streams[streamId] = socket.id;
+    socket.broadcast.emit('new-stream-available', streamId);
   });
-  // ... other game logic ...
+  socket.on('watch-stream', (streamId) => { const broadcasterSocketId = streams[streamId]; if (broadcasterSocketId) { console.log(`User ${socket.id} is watching stream ${streamId}`); io.to(broadcasterSocketId).emit('new-watcher', { watcherId: socket.id }); } });
+  socket.on('stream-signal-to-watcher', (data) => { io.to(data.watcherId).emit('stream-signal-from-broadcaster', { broadcasterId: socket.id, signal: data.signal }); });
+  socket.on('watcher-signal-to-streamer', (data) => { io.to(data.broadcasterId).emit('watcher-signal', { watcherId: socket.id, signal: data.signal }); });
+  socket.on('stop-stream', (streamId) => { if (streams[streamId] === socket.id) { delete streams[streamId]; console.log(`Stream ${streamId} ended.`); io.emit('stream-ended', streamId); } });
 
+  // --- Tic-Tac-Toe Game Logic ---
+  const getSocketIdFromUserId = (userId) => users[userId];
+
+  socket.on('game:invite', (data) => {
+    const targetSocketId = getSocketIdFromUserId(data.targetUserId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('game:invite', { from: socket.id, fromUserId: data.fromUserId, fromName: data.fromName });
+    }
+  });
+
+  socket.on('game:accept', (data) => {
+    io.to(data.targetSocketId).emit('game:start', { opponentName: data.myName });
+  });
+
+  socket.on('game:move', (data) => {
+    io.to(data.targetSocketId).emit('game:move', { board: data.board });
+  });
+
+  socket.on('game:reset', (data) => { io.to(data.targetSocketId).emit('game:reset'); });
+  socket.on('game:leave', (data) => { io.to(data.targetSocketId).emit('game:leave'); });
 
   // --- Disconnect Logic ---
   socket.on('disconnecting', () => {
     console.log(`User disconnected: ${socket.id}`);
 
-    // Handle group call disconnection
-    for (const roomId in rooms) {
-      const room = rooms[roomId];
-      let userIdToRemove = null;
-      for (const userId in room) {
-        if (room[userId].socketId === socket.id) {
-          userIdToRemove = userId;
-          break;
-        }
-      }
-      if (userIdToRemove) {
-        delete room[userIdToRemove];
-        // If only the bot is left, delete the room
-        if (Object.keys(room).length <= 1) {
-          delete rooms[roomId];
-        } else {
-          // Otherwise, just notify others the user has left
-          socket.to(roomId).emit('user-left', socket.id);
-          io.in(roomId).emit('room-state', room);
-        }
-        break;
-      }
+    // Unregister user
+    const userIdToUnregister = Object.keys(users).find(key => users[key] === socket.id);
+    if (userIdToUnregister) {
+      delete users[userIdToUnregister];
+      console.log(`User ${userIdToUnregister} unregistered.`);
     }
 
-    // ... other disconnect logic for games, streams, etc.
-  });
+    // Handle group call disconnection
+    for (const roomId of Object.keys(rooms)) {
+      let userIdToRemove = null;
+      for (const [userId, socketId] of Object.entries(rooms[roomId])) { if (socketId === socket.id) { userIdToRemove = userId; break; } }
+      if (userIdToRemove) { delete rooms[roomId][userIdToRemove]; socket.to(roomId).emit('user-left', socket.id); io.in(roomId).emit('room-state', rooms[roomId]); break; }
+    }
 
+    // Handle live stream disconnection
+    const streamId = Object.keys(streams).find(key => streams[key] === socket.id);
+    if (streamId) { delete streams[streamId]; console.log(`Stream ${streamId} ended due to broadcaster disconnect.`); io.emit('stream-ended', streamId); }
+  });
 });
 
 server.listen(PORT, () => {
