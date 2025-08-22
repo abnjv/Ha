@@ -4,8 +4,6 @@ import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, 
 import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getUserProfilePath, getUserNotificationsPath } from '../constants';
-import { get as getKey, set as setKey } from '../utils/db';
-import { generateKeyPair, exportKey } from '../utils/encryption';
 
 const AuthContext = createContext();
 
@@ -83,50 +81,21 @@ export const AuthProvider = ({ children }) => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    const initializeUserKeys = async () => {
-      const privateKeyName = `ecdh_private_key_${user.uid}`;
-      let privateKey = await getKey(privateKeyName);
-
-      if (!privateKey) {
-        console.log("No private key found, generating new key pair...");
-        const keyPair = await generateKeyPair();
-        privateKey = keyPair.privateKey;
-        await setKey(privateKeyName, keyPair.privateKey);
-
-        const publicKeyJwk = await exportKey(keyPair.publicKey);
-        await updateDoc(userDocRef, { publicKey: publicKeyJwk });
-        console.log("New key pair generated and public key published.");
-      } else {
-        console.log("Private key loaded from local storage.");
-      }
-    };
-
     const unsubscribeProfile = onSnapshot(userDocRef, async (docSnap) => {
       if (docSnap.exists()) {
-        const profileData = docSnap.data();
-        setUserProfile(profileData);
-        // Ensure keys are initialized if profile exists but keys don't
-        if (!profileData.publicKey) {
-          await initializeUserKeys();
-        }
+        setUserProfile(docSnap.data());
       } else {
-        // This is a new user, create profile and then keys
         const defaultProfile = {
           name: `مستخدم_${user.uid.substring(0, 4)}`,
           avatar: `https://placehold.co/128x128/${Math.floor(Math.random()*16777215).toString(16)}/FFFFFF?text=${'م'}`,
           xp: 0,
           bio: '',
           status: 'online',
-          julesCoins: 1000, // Starting balance for new users
-          purchasedItems: [], // Initialize empty inventory
-          isCreator: false, // Default to not being a creator
           lastSeen: serverTimestamp(),
           createdAt: serverTimestamp(),
         };
         await setDoc(userDocRef, defaultProfile);
         setUserProfile(defaultProfile);
-        // Now generate and publish keys for the new user
-        await initializeUserKeys();
       }
       setIsLoading(false);
     }, (error) => {

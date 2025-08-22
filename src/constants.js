@@ -42,4 +42,3 @@ export const getUserNotificationsPath = (appId, userId) => `${getUserPath(appId,
 export const SUPPORT_BOT_ID = 'support-bot-01';
 export const SUPPORT_BOT_NAME = 'Support Bot';
 export const SUPPORT_BOT_AVATAR = 'https://placehold.co/128x128/6B46C1/FFFFFF?text=BOT';
-export const ASSISTANT_BOT_ID = 'ai-assistant-jules';

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest run",
+    "test": "vitest",
     "preview": "vite preview",
     "dev:host": "vite --host",
     "start-server": "node signaling-server.js",
@@ -16,24 +16,16 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^2.8.2",
     "@tailwindcss/vite": "^4.1.12",
-    "chart.js": "^4.5.0",
-    "chess.js": "^1.4.0",
     "express": "^5.1.0",
     "firebase": "^12.1.0",
-    "framer-motion": "^12.23.12",
     "i18next": "^25.4.0",
     "i18next-browser-languagedetector": "^8.2.0",
     "i18next-http-backend": "^3.0.2",
-    "idb": "^8.0.3",
     "lucide-react": "^0.539.0",
     "react": "^19.1.1",
-    "react-chartjs-2": "^5.3.0",
     "react-dom": "^19.1.1",
-    "react-dropzone": "^14.3.8",
     "react-i18next": "^15.7.1",
-    "react-redux": "^9.2.0",
     "react-router-dom": "^7.8.1",
     "react-transition-group": "^4.4.5",
     "socket.io": "^4.8.1",
@@ -59,7 +51,6 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.12",
     "vite": "^7.1.2",
-    "vite-plugin-pwa": "^1.0.3",
     "vitest": "^3.2.4"
   }
 }

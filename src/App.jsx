@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { CSSTransition } from 'react-transition-group';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeProvider';
 import { ThemeContext } from './context/ThemeContext';
@@ -22,15 +23,7 @@ import UserProfileScreen from './components/profile/UserProfileScreen';
 import CreateGroupScreen from './components/group/CreateGroupScreen';
 import GroupChat from './components/group/GroupChat';
 import LiveStream from './components/stream/LiveStream';
-import VirtualStore from './components/store/VirtualStore';
-import InventoryScreen from './components/store/InventoryScreen';
-import ThreeDRoom from './components/world/ThreeDRoom';
-import MyRecordings from './components/recordings/MyRecordings';
-import CreatorDashboard from './components/creator/CreatorDashboard';
-import SubscriptionPlans from './components/creator/SubscriptionPlans';
-import GameLobby from './components/game/GameLobby';
-import ReloadPrompt from './components/core/ReloadPrompt';
-import NetworkStatusIndicator from './components/core/NetworkStatusIndicator';
+import PageTransition from './components/core/PageTransition';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -45,6 +38,7 @@ const ProtectedRoute = () => {
 };
 
 const AppContent = () => {
+  const location = useLocation();
   const { themeClasses } = useContext(ThemeContext);
   const { user, db, appId } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -74,7 +68,7 @@ const AppContent = () => {
 
   // This layout component can hold shared UI elements like the notification panel
   const Layout = ({ children }) => (
-    <div className={`min-h-screen ${themeClasses} antialiased`}>
+    <div className={`min-h-screen ${themeClasses} antialiased relative overflow-x-hidden`}>
       {children}
       {user && showNotifications && (
         <CSSTransition in={showNotifications} timeout={500} classNames="notification-panel">
@@ -90,37 +84,30 @@ const AppContent = () => {
 
   return (
     <Layout>
-      <ReloadPrompt />
-      <NetworkStatusIndicator />
-      <Routes>
-        <Route path="/login" element={<LoginScreen />} />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/login" element={<PageTransition><LoginScreen /></PageTransition>} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<HomeScreen onToggleNotifications={() => setShowNotifications(!showNotifications)} hasNotifications={hasUnreadNotifications} />} />
-          <Route path="/dashboard" element={<MainDashboard />} />
-          <Route path="/create-room" element={<CreateRoomScreen />} />
-          <Route path="/room/:roomId/:roomType" element={<VoiceChatRoom />} />
-          <Route path="/private-chat-list" element={<PrivateChatList />} />
-          <Route path="/chat/:friendId/:friendName" element={<PrivateChat />} />
-          <Route path="/friends" element={<FriendList />} />
-          <Route path="/add-friend" element={<AddFriendScreen />} />
-          <Route path="/profile" element={<UserProfileScreen />} />
-          <Route path="/create-group" element={<CreateGroupScreen />} />
-          <Route path="/group-chat/:groupId" element={<GroupChat />} />
-          <Route path="/stream/start" element={<LiveStream />} />
-          <Route path="/stream/watch/:streamId" element={<LiveStream />} />
-          <Route path="/store" element={<VirtualStore />} />
-          <Route path="/inventory" element={<InventoryScreen />} />
-          <Route path="/world" element={<ThreeDRoom />} />
-          <Route path="/my-recordings" element={<MyRecordings />} />
-          <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-          <Route path="/subscriptions" element={<SubscriptionPlans />} />
-          <Route path="/game/lobby" element={<GameLobby />} />
-        </Route>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<PageTransition><HomeScreen onToggleNotifications={() => setShowNotifications(!showNotifications)} hasNotifications={hasUnreadNotifications} /></PageTransition>} />
+            <Route path="/dashboard" element={<PageTransition><MainDashboard /></PageTransition>} />
+            <Route path="/create-room" element={<PageTransition><CreateRoomScreen /></PageTransition>} />
+            <Route path="/room/:roomId/:roomType" element={<PageTransition><VoiceChatRoom /></PageTransition>} />
+            <Route path="/private-chat-list" element={<PageTransition><PrivateChatList /></PageTransition>} />
+            <Route path="/chat/:friendId/:friendName" element={<PageTransition><PrivateChat /></PageTransition>} />
+            <Route path="/friends" element={<PageTransition><FriendList /></PageTransition>} />
+            <Route path="/add-friend" element={<PageTransition><AddFriendScreen /></PageTransition>} />
+            <Route path="/profile" element={<PageTransition><UserProfileScreen /></PageTransition>} />
+            <Route path="/create-group" element={<PageTransition><CreateGroupScreen /></PageTransition>} />
+            <Route path="/group-chat/:groupId" element={<PageTransition><GroupChat /></PageTransition>} />
+            <Route path="/stream/start" element={<PageTransition><LiveStream /></PageTransition>} />
+            <Route path="/stream/watch/:streamId" element={<PageTransition><LiveStream /></PageTransition>} />
+          </Route>
 
-        {/* Redirect any unknown paths to the home page if logged in, or login if not */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+          {/* Redirect any unknown paths to the home page if logged in, or login if not */}
+          <Route path="*" element={<PageTransition><Navigate to="/" /></PageTransition>} />
+        </Routes>
+      </AnimatePresence>
     </Layout>
   );
 };
