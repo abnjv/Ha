@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getDatabase, ref, onValue, onDisconnect, set as rtSet, serverTimestamp as rtServerTimestamp } from "firebase/database";
 import { getUserProfilePath, getUserNotificationsPath } from '../constants';
 
 const AuthContext = createContext();
@@ -108,6 +109,31 @@ export const AuthProvider = ({ children }) => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       updateDoc(userDocRef, { status: 'offline', lastSeen: serverTimestamp() });
     };
+  }, [user]);
+
+  // Realtime Database presence system
+  useEffect(() => {
+    if (!user) return;
+    const rtdb = getDatabase(app);
+    const userStatusRef = ref(rtdb, `status/${user.uid}`);
+    const isOfflineForDatabase = {
+      state: 'offline',
+      last_changed: rtServerTimestamp(),
+    };
+    const isOnlineForDatabase = {
+      state: 'online',
+      last_changed: rtServerTimestamp(),
+    };
+
+    const connectedRef = ref(rtdb, '.info/connected');
+    onValue(connectedRef, (snapshot) => {
+      if (snapshot.val() === false) {
+        return;
+      }
+      onDisconnect(userStatusRef).set(isOfflineForDatabase).then(() => {
+        rtSet(userStatusRef, isOnlineForDatabase);
+      });
+    });
   }, [user]);
 
   const sendNotification = async (targetUserId, type, message, payload = {}) => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { CSSTransition } from 'react-transition-group';
 import { AnimatePresence, motion } from 'framer-motion';
+import io from 'socket.io-client';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeProvider';
 import { ThemeContext } from './context/ThemeContext';
@@ -40,9 +41,10 @@ const ProtectedRoute = () => {
 const AppContent = () => {
   const location = useLocation();
   const { themeClasses } = useContext(ThemeContext);
-  const { user, db, appId } = useAuth();
+  const { user, db, appId, sendNotification } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const socketRef = useRef(null);
 
   // Set up real-time listener for notifications
   useEffect(() => {
@@ -61,6 +63,26 @@ const AppContent = () => {
       return () => unsubscribe();
     }
   }, [user, db, appId]);
+
+  useEffect(() => {
+    if (user && !socketRef.current) {
+      const socket = io(import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001');
+      socketRef.current = socket;
+      socket.emit('register', user.uid);
+
+      socket.on('room:invite', ({ fromName, roomId, roomType }) => {
+        sendNotification(user.uid, 'room_invite', `${fromName} has invited you to a room.`, { roomId, roomType });
+      });
+
+      return () => {
+        socket.disconnect();
+        socketRef.current = null;
+      };
+    } else if (!user && socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+  }, [user, sendNotification]);
 
   // This will be replaced with a real "mark as read" function later
   const handleClearNotifications = () => setNotifications([]);

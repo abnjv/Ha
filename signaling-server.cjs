@@ -65,6 +65,19 @@ io.on('connection', (socket) => {
     io.to(data.targetSocketId).emit('game:start', { opponentName: data.myName });
   });
 
+  // --- Room Invitation Logic ---
+  socket.on('room:invite', (data) => {
+    const targetSocketId = getSocketIdFromUserId(data.targetUserId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('room:invite', {
+        fromUserId: data.fromUserId,
+        fromName: data.fromName,
+        roomId: data.roomId,
+        roomType: data.roomType
+      });
+    }
+  });
+
   socket.on('game:move', (data) => {
     io.to(data.targetSocketId).emit('game:move', { board: data.board });
   });
