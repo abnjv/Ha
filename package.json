@@ -16,6 +16,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.12",
     "express": "^5.1.0",
     "firebase": "^12.1.0",
     "framer-motion": "^12.23.12",
