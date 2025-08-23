@@ -23,6 +23,8 @@ export const getFriendRequestsPath = (appId) => `${getPublicDataPath(appId)}/fri
 
 export const getInvitationsPath = (appId) => `${getPublicDataPath(appId)}/invitations`;
 
+export const getTicketsPath = (appId) => `${getPublicDataPath(appId)}/tickets`;
+
 // --- Group Paths ---
 export const getGroupsPath = (appId) => `${getPublicDataPath(appId)}/groups`;
 export const getGroupPath = (appId, groupId) => `${getGroupsPath(appId)}/${groupId}`;

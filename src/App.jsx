@@ -26,6 +26,8 @@ import GroupChat from './components/group/GroupChat';
 import LiveStream from './components/stream/LiveStream';
 import PageTransition from './components/core/PageTransition';
 import NotificationsScreen from './components/core/NotificationsScreen';
+import TicketSystem from './components/support/TicketSystem';
+import TicketDetail from './components/support/TicketDetail';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -126,6 +128,8 @@ const AppContent = () => {
             <Route path="/stream/start" element={<PageTransition><LiveStream /></PageTransition>} />
             <Route path="/stream/watch/:streamId" element={<PageTransition><LiveStream /></PageTransition>} />
             <Route path="/notifications" element={<PageTransition><NotificationsScreen /></PageTransition>} />
+            <Route path="/support" element={<PageTransition><TicketSystem /></PageTransition>} />
+            <Route path="/support/ticket/:ticketId" element={<PageTransition><TicketDetail /></PageTransition>} />
           </Route>
 
           {/* Redirect any unknown paths to the home page if logged in, or login if not */}
