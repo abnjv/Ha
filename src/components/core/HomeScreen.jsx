@@ -7,6 +7,7 @@ import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
 import { getRoomsPath, getUserFriendsPath, getGroupsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME } from '../../constants';
+import Upload from './Upload';
 
 const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
   const { t } = useTranslation();
@@ -128,6 +129,9 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
               </div>
             )}
           </div>
+        </div>
+        <div className="md:col-span-3 mt-8">
+          <Upload />
         </div>
       </main>
     </div>
