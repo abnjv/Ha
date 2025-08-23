@@ -37,6 +37,8 @@ const NotificationPanel = ({ notifications, onToggle }) => {
   const handleNotificationClick = (notification) => {
     if (notification.type === 'friend_request_accepted' && notification.payload?.fromUserId) {
         navigate(`/private-chat/${notification.payload.fromUserId}/${notification.payload.fromUserName}`);
+    } else if (notification.type === 'room_invite' && notification.payload?.roomId) {
+        navigate(`/room/${notification.payload.roomId}/${notification.payload.roomType || 'voice'}`);
     }
     // Future types can be handled here
     // e.g., if (notification.type === 'new_private_message') { ... }
@@ -52,7 +54,7 @@ const NotificationPanel = ({ notifications, onToggle }) => {
       case 'friend_request_received': return <UserCheck className="w-8 h-8 text-blue-500" />;
       case 'friend_request_accepted': return <UserCheck className="w-8 h-8 text-green-500" />;
       case 'giftReceived': return <Gift className="w-8 h-8 text-yellow-500" />;
-      case 'roomInvite': return <Users className="w-8 h-8 text-blue-500" />;
+      case 'room_invite': return <Users className="w-8 h-8 text-purple-500" />;
       default: return <Gift className="w-8 h-8 text-gray-500" />;
     }
   }

@@ -5,7 +5,8 @@ import { Mic, MicOff, PhoneCall, PhoneMissed, Send, MessageSquare, MoreHorizonta
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp, addDoc, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { getVoiceRoomParticipantsPath, getVoiceRoomMessagesPath, getVoiceRoomPath } from '../../constants';
+import { getDatabase, ref as rtdbRef, onValue } from "firebase/database";
+import { getVoiceRoomParticipantsPath, getVoiceRoomMessagesPath, getVoiceRoomPath, getUserFriendsPath, getInvitationsPath } from '../../constants';
 
 const debounce = (func, delay) => { let timeout; return (...args) => { clearTimeout(timeout); timeout = setTimeout(() => func(...args), delay); }; };
 
@@ -37,6 +38,8 @@ const VoiceChatRoom = () => {
   const [typingUsers, setTypingUsers] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [onlineFriends, setOnlineFriends] = useState([]);
+  const [showInvitePanel, setShowInvitePanel] = useState(false);
 
   const createPeerConnection = useCallback((targetSocketId, isOfferor) => {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
@@ -89,13 +92,111 @@ const VoiceChatRoom = () => {
   const findSocketIdByUid = (uid) => uidSocketMap[uid] || null;
   const ReplyQuote = ({ msg }) => <div className="p-2 mb-1 text-xs bg-gray-800 rounded-lg"><p className="font-bold text-gray-400">{msg.senderName}</p><p className="opacity-80 truncate">{msg.text}</p></div>;
 
+  const handleInviteFriend = async (friend) => {
+    if (!db || !user || !roomId) return;
+
+    // 1. Create an invitation document in Firestore
+    const invitation = {
+      fromUserId: user.uid,
+      fromName: userProfile.name,
+      toUserId: friend.id,
+      roomId: roomId,
+      roomType: 'voice', // Assuming 'voice' for now, can be dynamic
+      status: 'pending',
+      createdAt: serverTimestamp(),
+    };
+
+    try {
+      await addDoc(collection(db, getInvitationsPath(appId)), invitation);
+
+      // 2. Emit a socket event to notify the user in real-time
+      socketRef.current.emit('room:invite', {
+        targetUserId: friend.id,
+        fromUserId: user.uid,
+        fromName: userProfile.name,
+        roomId: roomId,
+        roomType: 'voice',
+      });
+
+      alert(`Invitation sent to ${friend.name}`);
+    } catch (error) {
+      console.error("Error sending invitation:", error);
+      alert("Failed to send invitation.");
+    }
+  };
+
+  useEffect(() => {
+    if (!db || !user?.uid) return;
+
+    const friendsQuery = query(collection(db, getUserFriendsPath(appId, user.uid)));
+    const unsubscribeFriends = onSnapshot(friendsQuery, (snapshot) => {
+      const friendsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const rtdb = getDatabase();
+
+      const onlineStatusListeners = friendsData.map(friend => {
+        const userStatusRef = rtdbRef(rtdb, `status/${friend.id}`);
+        return onValue(userStatusRef, (statusSnap) => {
+          setOnlineFriends(prevOnlineFriends => {
+            const friendIndex = prevOnlineFriends.findIndex(f => f.id === friend.id);
+            if (statusSnap.exists() && statusSnap.val().state === 'online') {
+              if (friendIndex === -1) {
+                return [...prevOnlineFriends, friend];
+              }
+              return prevOnlineFriends;
+            } else {
+              if (friendIndex > -1) {
+                return prevOnlineFriends.filter(f => f.id !== friend.id);
+              }
+              return prevOnlineFriends;
+            }
+          });
+        });
+      });
+
+      return () => {
+        onlineStatusListeners.forEach(unsubscribe => unsubscribe());
+      };
+    });
+
+    return () => unsubscribeFriends();
+  }, [db, appId, user]);
+
   return (
     <div className="h-screen bg-gray-800 text-white grid grid-cols-1 md:grid-cols-4">
       <div className="md:col-span-3 flex flex-col h-screen bg-gray-900">
-        <header className="flex justify-between items-center p-4 border-b border-gray-700"><h1 className="text-xl font-bold">Room: {roomId}</h1><button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600"><X size={20}/></button></header>
+        <header className="flex justify-between items-center p-4 border-b border-gray-700">
+          <h1 className="text-xl font-bold">Room: {roomId}</h1>
+          <div>
+            <button onClick={() => setShowInvitePanel(!showInvitePanel)} className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 mr-2">Invite</button>
+            <button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600"><X size={20}/></button>
+          </div>
+        </header>
         <div className="flex-grow p-4 overflow-y-auto"><div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">{participants.map(p => (<div key={p.id} className={`relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${speakingState[findSocketIdByUid(p.id)] ? 'border-2 border-green-400' : ''}`}><img src={p.avatar} alt={p.name} className="w-24 h-24 rounded-full mb-2" /><p className="font-semibold text-center text-sm">{p.name}</p></div>))}</div></div>
         <footer className="p-4 bg-gray-950 flex justify-center items-center space-x-4 border-t border-gray-700"><button onClick={isJoined ? endVoiceChat : startVoiceChat} className={`p-4 rounded-full text-white shadow-lg ${isJoined ? 'bg-red-600' : 'bg-green-600'}`}>{isJoined ? <PhoneMissed /> : <PhoneCall />}</button>{isJoined && <button onClick={toggleMute} className={`p-4 rounded-full shadow-lg ${isMuted ? 'bg-gray-600' : 'bg-blue-600'}`}>{isMuted ? <MicOff /> : <Mic />}</button>}</footer>
       </div>
+      {showInvitePanel && (
+        <div className="absolute top-0 right-0 h-full w-full md:w-96 bg-gray-950/90 backdrop-blur-md p-6 flex flex-col border-l border-gray-800 transition-transform duration-500 ease-in-out transform z-50">
+          <div className="flex justify-between items-center pb-4 border-b border-gray-800">
+            <h3 className="text-xl font-extrabold text-white">Invite Friends</h3>
+            <button onClick={() => setShowInvitePanel(false)} className="p-2 rounded-full hover:bg-gray-800 transition-colors duration-200"><X className="w-6 h-6 text-white" /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto my-4 space-y-4 custom-scrollbar">
+            {onlineFriends.length > 0 ? (
+              onlineFriends.map(friend => (
+                <div key={friend.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-800">
+                  <div className="flex items-center">
+                    <img src={friend.avatar || '/default-avatar.png'} alt={friend.name} className="w-10 h-10 rounded-full mr-4" />
+                    <p className="font-bold">{friend.name}</p>
+                  </div>
+                  <button onClick={() => handleInviteFriend(friend)} className="px-4 py-2 bg-blue-600 text-white rounded-full font-bold shadow-lg hover:bg-blue-700">Invite</button>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-center">No online friends</p>
+            )}
+          </div>
+        </div>
+      )}
       <div className="md:col-span-1 flex flex-col bg-gray-800 border-l border-gray-700 h-screen">
         <div className="p-4 border-b border-gray-700"><h2 className="text-xl font-bold">Chat</h2></div>
         <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">{isLoadingMessages ? <div className="flex justify-center items-center h-full"><div className="w-8 h-8 border-2 border-dashed rounded-full animate-spin border-blue-500"></div></div> : messages.map(message => (<div key={message.id} className={`group relative my-2 flex flex-col ${message.senderId === user.uid ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-lg max-w-xs ${message.senderId === user.uid ? 'bg-blue-600' : 'bg-gray-700'}`}><p className="text-xs font-bold text-gray-400">{message.senderName}</p>{message.replyTo && <ReplyQuote msg={message.replyTo} />}{editingMessageId === message.id ? ( <form onSubmit={handleUpdateMessage}><input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-blue-700 text-white rounded p-1" autoFocus/><div className="flex justify-end space-x-2 mt-1"><button type="button" onClick={() => setEditingMessageId(null)} className="text-xs">Cancel</button><button type="submit" className="text-xs font-bold">Save</button></div></form>) : (message.type === 'image' ? <img src={message.file.url} alt={message.file.name} className="rounded-lg max-w-full h-auto mt-1" /> : message.type === 'file' ? <a href={message.file.url} target="_blank" rel="noopener noreferrer" className="flex items-center underline text-blue-300"><FileIcon className="mr-2"/>{message.file.name}</a> : <p className="text-sm break-words">{message.text}</p>)}<p className="text-xs text-gray-400 mt-1 text-right">{message.isEdited && <i>(edited)</i>}</p></div>{message.senderId === user.uid && (<div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100"><button onClick={() => setShowOptionsForMessageId(showOptionsForMessageId === message.id ? null : message.id)} className="p-1 rounded-full hover:bg-gray-600"><MoreHorizontal size={14}/></button>{showOptionsForMessageId === message.id && (<div className="absolute left-full ml-1 w-28 bg-gray-900 border border-gray-700 rounded shadow-lg z-10 py-1"><button onClick={() => startReplying(message)} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-700 flex items-center"><MessageSquare size={14} className="mr-2"/> Reply</button>{message.type === 'text' && <button onClick={() => startEditing(message)} className="w-full text-left text-sm px-3 py-1.5 hover:bg-gray-700 flex items-center"><Edit size={14} className="mr-2"/> Edit</button>}<button onClick={() => handleDeleteMessage(message.id)} className="w-full text-left text-sm px-3 py-1.5 text-red-400 hover:bg-gray-700 flex items-center"><Trash2 size={14} className="mr-2"/> Delete</button></div>)}</div>)}</div>))}<div ref={messagesEndRef} /></div>
