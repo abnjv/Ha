@@ -25,6 +25,7 @@ import CreateGroupScreen from './components/group/CreateGroupScreen';
 import GroupChat from './components/group/GroupChat';
 import LiveStream from './components/stream/LiveStream';
 import PageTransition from './components/core/PageTransition';
+import NotificationsScreen from './components/core/NotificationsScreen';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -86,7 +87,7 @@ const AppContent = () => {
 
   // This will be replaced with a real "mark as read" function later
   const handleClearNotifications = () => setNotifications([]);
-  const hasUnreadNotifications = notifications.some(n => !n.read);
+  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
 
   // This layout component can hold shared UI elements like the notification panel
   const Layout = ({ children }) => (
@@ -111,7 +112,7 @@ const AppContent = () => {
           <Route path="/login" element={<PageTransition><LoginScreen /></PageTransition>} />
 
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<PageTransition><HomeScreen onToggleNotifications={() => setShowNotifications(!showNotifications)} hasNotifications={hasUnreadNotifications} /></PageTransition>} />
+            <Route path="/" element={<PageTransition><HomeScreen onToggleNotifications={() => setShowNotifications(!showNotifications)} unreadCount={unreadNotificationsCount} /></PageTransition>} />
             <Route path="/dashboard" element={<PageTransition><MainDashboard /></PageTransition>} />
             <Route path="/create-room" element={<PageTransition><CreateRoomScreen /></PageTransition>} />
             <Route path="/room/:roomId/:roomType" element={<PageTransition><VoiceChatRoom /></PageTransition>} />
@@ -124,6 +125,7 @@ const AppContent = () => {
             <Route path="/group-chat/:groupId" element={<PageTransition><GroupChat /></PageTransition>} />
             <Route path="/stream/start" element={<PageTransition><LiveStream /></PageTransition>} />
             <Route path="/stream/watch/:streamId" element={<PageTransition><LiveStream /></PageTransition>} />
+            <Route path="/notifications" element={<PageTransition><NotificationsScreen /></PageTransition>} />
           </Route>
 
           {/* Redirect any unknown paths to the home page if logged in, or login if not */}
