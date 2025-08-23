@@ -22,3 +22,22 @@ vi.mock('react-i18next', () => ({
     };
   },
 }));
+
+// Mock AuthContext to prevent Firebase initialization in tests
+vi.mock('src/context/AuthContext.jsx', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    useAuth: () => ({
+      user: { uid: 'test-user-id' },
+      userProfile: { name: 'Test User', avatar: 'https://placehold.co/128' },
+      isLoading: false,
+      logout: vi.fn(),
+      sendNotification: vi.fn(),
+      db: {},
+      storage: {},
+      auth: {},
+      appId: 'test-app-id',
+    }),
+  };
+});
