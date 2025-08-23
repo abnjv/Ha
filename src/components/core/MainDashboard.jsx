@@ -5,9 +5,13 @@ import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { getRoomsPath } from '../../constants';
+import { Line } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const MainDashboard = () => {
-  const { user, db, appId } = useAuth();
+  const { user, userProfile, db, appId } = useAuth();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +38,19 @@ const MainDashboard = () => {
     return () => unsubscribe();
   }, [db, appId]);
 
+  const chartData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      {
+        label: 'Weekly Activity',
+        data: [65, 59, 80, 81, 56, 55, 40],
+        fill: false,
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1,
+      },
+    ],
+  };
+
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
       <header className={`flex justify-between items-center p-4 rounded-3xl mb-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
@@ -49,7 +66,40 @@ const MainDashboard = () => {
       </header>
 
       <div className="flex-1 p-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-center mb-4">اختر غرفتك الفضائية</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className={`p-4 rounded-xl shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h3 className="text-lg font-bold">Friends</h3>
+            <p className="text-3xl font-bold">{userProfile?.friendsCount || 0}</p>
+          </div>
+          <div className={`p-4 rounded-xl shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h3 className="text-lg font-bold">Rooms Created</h3>
+            <p className="text-3xl font-bold">{userProfile?.roomsCreated || 0}</p>
+          </div>
+          <div className={`p-4 rounded-xl shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <h3 className="text-lg font-bold">XP</h3>
+            <p className="text-3xl font-bold">{userProfile?.xp || 0}</p>
+          </div>
+        </div>
+        <div className={`p-4 rounded-xl shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <h3 className="text-lg font-bold mb-4">Weekly Activity</h3>
+          <Line data={chartData} />
+        </div>
+        <div className={`p-4 rounded-xl shadow-lg mt-8 ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+          <h3 className="text-lg font-bold mb-4">Settings</h3>
+          <div className="flex justify-between items-center">
+            <p>Theme</p>
+            <button onClick={toggleDarkMode} className="px-4 py-2 bg-purple-600 text-white rounded-full font-bold shadow-lg hover:bg-purple-700">
+              {isDarkMode ? 'Light' : 'Dark'}
+            </button>
+          </div>
+          <div className="flex justify-between items-center mt-4">
+            <p>Profile</p>
+            <button onClick={() => navigate('/profile')} className="px-4 py-2 bg-blue-600 text-white rounded-full font-bold shadow-lg hover:bg-blue-700">
+              Edit Profile
+            </button>
+          </div>
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 mt-8">اختر غرفتك الفضائية</h1>
         {user?.uid && (
           <p className="text-sm text-center text-gray-400 mb-8">
             User ID: <span className="font-mono break-all">{user.uid}</span>
