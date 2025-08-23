@@ -9,7 +9,7 @@ import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/f
 import { getRoomsPath, getUserFriendsPath, getGroupsPath, SUPPORT_BOT_ID, SUPPORT_BOT_NAME } from '../../constants';
 import Upload from './Upload';
 
-const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
+const HomeScreen = ({ onToggleNotifications, unreadCount }) => {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode, themeClasses } = useContext(ThemeContext);
   const { user, logout, db, appId } = useAuth();
@@ -65,7 +65,14 @@ const HomeScreen = ({ onToggleNotifications, hasNotifications }) => {
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
           <button onClick={() => navigate(`/chat/${SUPPORT_BOT_ID}/${SUPPORT_BOT_NAME}`)} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
-          <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative"><Bell className="w-6 h-6 text-white" />{hasNotifications && <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-gray-900 bg-red-500"></span>}</button>
+          <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative">
+            <Bell className="w-6 h-6 text-white" />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                {unreadCount}
+              </span>
+            )}
+          </button>
           <button onClick={handleLogout} className="px-4 py-2 bg-red-600 text-white rounded-full font-bold shadow-lg hover:bg-red-700"><LogOut className="w-4 h-4 inline-block ms-1" /> Logout</button>
         </div>
       </header>
