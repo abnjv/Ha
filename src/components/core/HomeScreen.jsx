@@ -64,7 +64,7 @@ const HomeScreen = ({ onToggleNotifications, unreadCount }) => {
           <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-gray-700"><Sun className="w-6 h-6 text-yellow-500" /></button>
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
-          <button onClick={() => navigate(`/chat/${SUPPORT_BOT_ID}/${SUPPORT_BOT_NAME}`)} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
+          <button onClick={() => navigate('/support')} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
           <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative">
             <Bell className="w-6 h-6 text-white" />
             {unreadCount > 0 && (
