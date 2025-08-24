@@ -68,6 +68,7 @@ const NotificationPanel = ({ notifications, onToggle }) => {
       case 'friend_request_accepted': return <UserCheck className="w-8 h-8 text-green-500" />;
       case 'giftReceived': return <Gift className="w-8 h-8 text-yellow-500" />;
       case 'room_invite': return <Users className="w-8 h-8 text-purple-500" />;
+      case 'donation_received': return <Gift className="w-8 h-8 text-yellow-500" />;
       default: return <Gift className="w-8 h-8 text-gray-500" />;
     }
   }
