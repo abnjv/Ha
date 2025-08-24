@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy } from 'lucide-react';
+import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy, BarChart2 } from 'lucide-react';
 import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -65,6 +65,7 @@ const HomeScreen = ({ onToggleNotifications, unreadCount }) => {
           <button onClick={() => navigate('/profile')} className="p-2 rounded-full hover:bg-gray-700" title="Profile"><UserIcon className="w-6 h-6 text-blue-500" /></button>
           <button onClick={() => navigate('/friends')} className="p-2 rounded-full hover:bg-gray-700" title="Friends"><Users className="w-6 h-6 text-pink-500" /></button>
           <button onClick={() => navigate('/support')} className="p-2 rounded-full hover:bg-gray-700" title="Help & Support"><LifeBuoy className="w-6 h-6 text-green-500" /></button>
+          <button onClick={() => navigate('/analytics')} className="p-2 rounded-full hover:bg-gray-700" title="Analytics"><BarChart2 className="w-6 h-6 text-purple-500" /></button>
           <button onClick={onToggleNotifications} className="p-2 rounded-full hover:bg-gray-700 relative">
             <Bell className="w-6 h-6 text-white" />
             {unreadCount > 0 && (
