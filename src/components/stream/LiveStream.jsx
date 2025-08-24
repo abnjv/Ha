@@ -3,10 +3,10 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeContext } from '../../context/ThemeContext';
-import { CornerUpLeft, Radio, XCircle, Users } from 'lucide-react';
+import { CornerUpLeft, Radio, XCircle, Users, Send } from 'lucide-react';
 
 const LiveStream = () => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -17,6 +17,8 @@ const LiveStream = () => {
   const [isLive, setIsLive] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [stream, setStream] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
 
   const socketRef = useRef();
   const videoRef = useRef();
@@ -33,6 +35,7 @@ const LiveStream = () => {
     if (!streamId) return;
 
     socketRef.current = io(import.meta.env.VITE_SIGNALING_SERVER_URL);
+    socketRef.current.emit('join-room', streamId, user.uid);
 
     if (isBroadcaster) {
       // Logic for broadcaster is handled by button click
@@ -128,58 +131,97 @@ const LiveStream = () => {
     setStream(null);
   };
 
-  const renderBroadcasterView = () => (
+  // Combined render logic for both broadcaster and watcher
+  const renderStreamView = () => (
     <div className="w-full h-full flex flex-col">
       <div className="relative flex-1 bg-black">
-        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
-        {isLive && (
-          <div className="absolute top-4 left-4 flex items-center space-x-4">
-            <div className="flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full animate-pulse">
-              <Radio size={16} />
-              <span>LIVE</span>
-            </div>
+        <video ref={videoRef} autoPlay playsInline muted={isBroadcaster} className="w-full h-full object-contain" />
+        <div className="absolute top-4 left-4 flex items-center space-x-4">
+          <div className="flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full animate-pulse">
+            <Radio size={16} />
+            <span>LIVE</span>
+          </div>
+          {isBroadcaster && (
             <div className="flex items-center space-x-2 bg-gray-800/70 text-white px-3 py-1 rounded-full">
               <Users size={16} />
               <span>{viewerCount}</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-      <div className="p-4 bg-gray-800 flex justify-center">
-        {isLive ? (
-          <button onClick={handleStopStream} className="px-6 py-3 bg-red-600 text-white font-bold rounded-full flex items-center space-x-2">
-            <XCircle />
-            <span>Stop Stream</span>
-          </button>
-        ) : (
-          <button onClick={handleGoLive} className="px-6 py-3 bg-green-600 text-white font-bold rounded-full">Go Live</button>
-        )}
-      </div>
+      {isBroadcaster && (
+        <div className="p-4 bg-gray-800 flex justify-center">
+          {isLive ? (
+            <button onClick={handleStopStream} className="px-6 py-3 bg-red-600 text-white font-bold rounded-full flex items-center space-x-2">
+              <XCircle />
+              <span>Stop Stream</span>
+            </button>
+          ) : (
+            <button onClick={handleGoLive} className="px-6 py-3 bg-green-600 text-white font-bold rounded-full">Go Live</button>
+          )}
+        </div>
+      )}
     </div>
   );
 
-  const renderWatcherView = () => (
-    <div className="w-full h-full flex flex-col">
-       <div className="relative flex-1 bg-black">
-        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
-        <div className="absolute top-4 left-4 flex items-center space-x-2 bg-red-600 text-white px-3 py-1 rounded-full">
-            <Radio size={16} />
-            <span>LIVE</span>
-        </div>
-       </div>
-    </div>
-  );
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (inputMessage.trim() && socketRef.current) {
+      const messageData = {
+        text: inputMessage,
+        user: userProfile.name,
+        streamId: streamId,
+      };
+      socketRef.current.emit('live-chat-message', messageData);
+      setInputMessage('');
+    }
+  };
+
+  useEffect(() => {
+    if (socketRef.current) {
+      socketRef.current.on('live-chat-message', (message) => {
+        setChatMessages(prevMessages => [...prevMessages, message]);
+      });
+    }
+  }, [socketRef.current]);
 
   return (
-    <div className={`flex flex-col min-h-screen ${themeClasses}`}>
-      <header className={`flex items-center justify-between p-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'} border-b border-gray-700`}>
-        <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft /></button>
-        <h1 className="text-xl font-bold">{isBroadcaster ? 'Your Live Stream' : `Watching ${streamId}`}</h1>
-        <div className="w-10"></div>
-      </header>
-      <main className="flex-1 flex items-center justify-center">
-        {isBroadcaster ? renderBroadcasterView() : renderWatcherView()}
-      </main>
+    <div className={`flex h-screen ${themeClasses}`}>
+      <div className="flex-1 flex flex-col">
+        <header className={`flex items-center justify-between p-4 shadow-lg ${isDarkMode ? 'bg-gray-900' : 'bg-white'} border-b border-gray-700`}>
+          <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-700"><CornerUpLeft /></button>
+          <h1 className="text-xl font-bold">{isBroadcaster ? 'Your Live Stream' : `Watching ${streamId}`}</h1>
+          <div className="w-10"></div>
+        </header>
+      <main className="flex-1 flex items-center justify-center bg-black">
+        {renderStreamView()}
+        </main>
+      </div>
+      <div className="w-96 flex flex-col bg-gray-800 border-l border-gray-700">
+        <div className="p-4 border-b border-gray-700"><h2 className="text-xl font-bold">Live Chat</h2></div>
+        <div className="flex-1 p-4 overflow-y-auto space-y-2">
+          {chatMessages.map((msg, index) => (
+            <div key={index}>
+              <span className="font-bold">{msg.user}: </span>
+              <span>{msg.text}</span>
+            </div>
+          ))}
+        </div>
+        <div className="p-4 border-t border-gray-700">
+          <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder="Send a message..."
+              className="flex-1 p-2 rounded-full bg-gray-700 focus:outline-none"
+            />
+            <button type="submit" className="p-2 rounded-full bg-blue-600">
+              <Send size={20} />
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };
