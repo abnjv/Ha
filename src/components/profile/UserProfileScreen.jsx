@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Edit, X, Save, Plus, Globe, Gift } from 'lucide-react';
+import { ArrowLeft, Edit, X, Save, Plus, Globe, Gift, Award } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, setDoc } from 'firebase/firestore';
 import DonationModal from '../donations/DonationModal';
@@ -103,6 +103,11 @@ const UserProfileScreen = () => {
             إضافة صديق
           </button>
         )}
+
+      <button onClick={() => navigate('/achievements')} className="w-full py-3 px-6 bg-purple-600 text-white font-bold rounded-xl shadow-lg hover:bg-purple-700 transition duration-300 mt-4">
+        <Award className="inline-block mr-2" />
+        Achievements
+      </button>
 
       {!isEditing && user.uid !== userProfile.id && (
         <button onClick={() => setIsDonationModalOpen(true)} className="w-full py-3 px-6 bg-yellow-500 text-black font-bold rounded-xl shadow-lg hover:bg-yellow-600 transition duration-300 mt-4">

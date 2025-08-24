@@ -9,7 +9,7 @@ import { getUserFriendsPath, getFriendRequestsPath } from '../../constants';
 
 const FriendList = () => {
   const { t } = useTranslation();
-  const { user, userProfile, db, appId, sendNotification } = useAuth();
+  const { user, userProfile, db, appId, sendNotification, awardAchievement } = useAuth();
   const navigate = useNavigate();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [friends, setFriends] = useState([]);
@@ -53,6 +53,10 @@ const FriendList = () => {
 
     try {
       await batch.commit();
+      // Award achievement if it's the first friend
+      if (friends.length === 0) {
+        awardAchievement('FIRST_FRIEND');
+      }
     } catch (error) {
       console.error("Error accepting friend request:", error);
     }

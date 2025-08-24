@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getRoomsPath } from '../../constants';
 
 const CreateRoomScreen = () => {
-  const { user, userProfile, db, appId } = useAuth();
+  const { user, userProfile, db, appId, awardAchievement } = useAuth();
   const navigate = useNavigate();
   const [roomTitle, setRoomTitle] = useState('');
   const [roomDescription, setRoomDescription] = useState('');
@@ -31,6 +31,12 @@ const CreateRoomScreen = () => {
         createdAt: serverTimestamp(),
       };
       await addDoc(roomsCollectionRef, newRoom);
+
+      // Award achievement if it's the first room created by the user
+      if (!userProfile.achievements?.FIRST_ROOM) {
+        awardAchievement('FIRST_ROOM');
+      }
+
       navigate('/dashboard'); // Navigate back to dashboard after creation
     } catch (error) {
       console.error("Error creating new room:", error);
