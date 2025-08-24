@@ -5,6 +5,7 @@ import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, add
 import { getStorage } from 'firebase/storage';
 import { getDatabase, ref, onValue, onDisconnect, set as rtSet, serverTimestamp as rtServerTimestamp } from "firebase/database";
 import { getUserProfilePath, getUserNotificationsPath } from '../constants';
+import { achievements } from '../achievements';
 
 const AuthContext = createContext();
 
@@ -152,6 +153,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const awardAchievement = async (achievementId) => {
+    if (!user || !db || userProfile?.achievements?.[achievementId]) return;
+
+    const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
+    try {
+      await updateDoc(userDocRef, {
+        [`achievements.${achievementId}`]: true
+      });
+      // Optionally, send a notification for the achievement
+      sendNotification(user.uid, 'achievement_unlocked', `You've unlocked the "${achievements[achievementId].name}" achievement!`);
+    } catch (error) {
+      console.error(`Failed to award achievement ${achievementId}:`, error);
+    }
+  };
+
   const value = {
     user,
     userProfile,
@@ -162,6 +178,7 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     logout: () => signOut(auth),
     sendNotification,
+    awardAchievement,
   };
 
   if (firebaseError) {
