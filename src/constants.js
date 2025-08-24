@@ -27,6 +27,8 @@ export const getTicketsPath = (appId) => `${getPublicDataPath(appId)}/tickets`;
 
 export const getStreamMessagesPath = (appId, streamId) => `${getPublicDataPath(appId)}/stream_messages/${streamId}`;
 
+export const getTransactionsPath = (appId) => `${getPublicDataPath(appId)}/transactions`;
+
 // --- Group Paths ---
 export const getGroupsPath = (appId) => `${getPublicDataPath(appId)}/groups`;
 export const getGroupPath = (appId, groupId) => `${getGroupsPath(appId)}/${groupId}`;

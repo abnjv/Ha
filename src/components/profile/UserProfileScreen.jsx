@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Edit, X, Save, Plus, Globe } from 'lucide-react';
+import { ArrowLeft, Edit, X, Save, Plus, Globe, Gift } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, setDoc } from 'firebase/firestore';
+import DonationModal from '../donations/DonationModal';
 import { getUserProfilePath } from '../../constants';
 import { useAuth } from '../../context/AuthContext';
 
@@ -20,6 +21,7 @@ const UserProfileScreen = () => {
   const [newUserName, setNewUserName] = useState(userProfile?.name || '');
   const [newUserBio, setNewUserBio] = useState(userProfile?.bio || '');
   const [isLoading, setIsLoading] = useState(false);
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -101,6 +103,19 @@ const UserProfileScreen = () => {
             إضافة صديق
           </button>
         )}
+
+      {!isEditing && user.uid !== userProfile.id && (
+        <button onClick={() => setIsDonationModalOpen(true)} className="w-full py-3 px-6 bg-yellow-500 text-black font-bold rounded-xl shadow-lg hover:bg-yellow-600 transition duration-300 mt-4">
+          <Gift className="inline-block mr-2" />
+          Donate XP
+        </button>
+      )}
+
+      <DonationModal
+        isOpen={isDonationModalOpen}
+        onClose={() => setIsDonationModalOpen(false)}
+        recipient={userProfile}
+      />
 
         <div className="mt-8 border-t border-gray-700 pt-6">
           <h3 className="text-lg font-bold mb-4 flex items-center justify-center space-x-2">
