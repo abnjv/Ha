@@ -85,6 +85,13 @@ io.on('connection', (socket) => {
   socket.on('game:reset', (data) => { io.to(data.targetSocketId).emit('game:reset'); });
   socket.on('game:leave', (data) => { io.to(data.targetSocketId).emit('game:leave'); });
 
+  // --- Live Stream Chat Logic ---
+  socket.on('live-chat-message', (data) => {
+    // The client sends the streamId, so we can broadcast to the correct room.
+    // The room name for a stream is the streamId.
+    io.to(data.streamId).emit('live-chat-message', data);
+  });
+
   // --- Disconnect Logic ---
   socket.on('disconnecting', () => {
     console.log(`User disconnected: ${socket.id}`);
