@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CornerUpLeft, Send as SendIcon, MoreHorizontal, Edit, Trash2, MessageSquare, X, Paperclip, File as FileIcon, ShieldX, Video, VideoOff, Mic, MicOff, PhoneOff } from 'lucide-react';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
-import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, Timestamp, deleteField } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -18,7 +17,7 @@ const PeerVideo = ({ peer }) => {
 };
 
 const GroupChat = () => {
-  const { user, userProfile, db, storage, appId } = useAuth();
+  const { user, userProfile, db, storage, appId, socket } = useAuth();
   const navigate = useNavigate();
   const { groupId } = useParams();
 
@@ -41,7 +40,6 @@ const GroupChat = () => {
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(null);
 
-  const socketRef = useRef();
   const peersRef = useRef({});
   const localVideoRef = useRef();
   const messagesEndRef = useRef(null);
@@ -73,10 +71,11 @@ const GroupChat = () => {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
-    if (!inCall || !user) return;
-    socketRef.current = io(import.meta.env.VITE_SIGNALING_SERVER_URL);
-    socketRef.current.emit('join-room', groupId, user.uid);
-    socketRef.current.on('room-state', (roomState) => {
+    if (!inCall || !user || !socket) return;
+
+    socket.emit('join-room', groupId, user.uid);
+
+    const handleRoomState = (roomState) => {
       const allUsers = roomState[groupId];
       if (!allUsers) return;
       Object.keys(allUsers).forEach(userId => {
@@ -84,33 +83,49 @@ const GroupChat = () => {
           createPeer(allUsers[userId], user.uid, localStream);
         }
       });
-    });
-    socketRef.current.on('user-joined', (userId, socketId) => { createPeer(socketId, user.uid, localStream); });
-    socketRef.current.on('webrtc-offer', ({ senderSocketId, sdp }) => { handleOffer(senderSocketId, sdp); });
-    socketRef.current.on('webrtc-answer', ({ senderSocketId, sdp }) => { handleAnswer(senderSocketId, sdp); });
-    socketRef.current.on('webrtc-ice-candidate', ({ senderSocketId, candidate }) => { handleIceCandidate(senderSocketId, candidate); });
-    socketRef.current.on('user-left', (socketId) => {
+    };
+
+    const handleUserJoined = (userId, socketId) => createPeer(socketId, user.uid, localStream);
+    const handleOffer = (data) => handleOffer(data.senderSocketId, data.sdp);
+    const handleAnswer = (data) => handleAnswer(data.senderSocketId, data.sdp);
+    const handleIceCandidate = (data) => handleIceCandidate(data.senderSocketId, data.candidate);
+    const handleUserLeft = (socketId) => {
       const peerIdToRemove = Object.keys(peersRef.current).find(key => peersRef.current[key].socketId === socketId);
       if (peerIdToRemove) {
         peersRef.current[peerIdToRemove].destroy();
         delete peersRef.current[peerIdToRemove];
         setPeers(prev => prev.filter(p => p.socketId !== socketId));
       }
-    });
+    };
+
+    socket.on('room-state', handleRoomState);
+    socket.on('user-joined', handleUserJoined);
+    socket.on('webrtc-offer', handleOffer);
+    socket.on('webrtc-answer', handleAnswer);
+    socket.on('webrtc-ice-candidate', handleIceCandidate);
+    socket.on('user-left', handleUserLeft);
+
     return () => {
-      socketRef.current.disconnect();
+      socket.off('room-state', handleRoomState);
+      socket.off('user-joined', handleUserJoined);
+      socket.off('webrtc-offer', handleOffer);
+      socket.off('webrtc-answer', handleAnswer);
+      socket.off('webrtc-ice-candidate', handleIceCandidate);
+      socket.off('user-left', handleUserLeft);
+
+      // We don't disconnect the shared socket here
       localStream?.getTracks().forEach(track => track.stop());
       Object.values(peersRef.current).forEach(peer => peer.destroy());
     };
-  }, [inCall, user, groupId, localStream]);
+  }, [inCall, user, groupId, localStream, socket]);
 
   function createPeer(targetSocketId, senderUserId, stream) {
     const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     peersRef.current[targetSocketId] = peer;
     stream.getTracks().forEach(track => peer.addTrack(track, stream));
-    peer.onicecandidate = event => { if (event.candidate) { socketRef.current.emit('webrtc-ice-candidate', { targetSocketId, candidate: event.candidate }); } };
+    peer.onicecandidate = event => { if (event.candidate) { socket.emit('webrtc-ice-candidate', { targetSocketId, candidate: event.candidate }); } };
     peer.ontrack = event => { setPeers(prev => prev.find(p => p.socketId === targetSocketId) ? prev : [...prev, { socketId: targetSocketId, stream: event.streams[0] }]); };
-    peer.createOffer().then(offer => peer.setLocalDescription(offer)).then(() => { socketRef.current.emit('webrtc-offer', { targetSocketId, sdp: peer.localDescription }); });
+    peer.createOffer().then(offer => peer.setLocalDescription(offer)).then(() => { socket.emit('webrtc-offer', { targetSocketId, sdp: peer.localDescription }); });
     return peer;
   }
 
@@ -118,8 +133,8 @@ const GroupChat = () => {
     const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     peersRef.current[senderSocketId] = peer;
     localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
-    peer.setRemoteDescription(sdp).then(() => { peer.createAnswer().then(answer => peer.setLocalDescription(answer)).then(() => { socketRef.current.emit('webrtc-answer', { targetSocketId: senderSocketId, sdp: peer.localDescription }); }); });
-    peer.onicecandidate = event => { if (event.candidate) { socketRef.current.emit('webrtc-ice-candidate', { targetSocketId: senderSocketId, candidate: event.candidate }); } };
+    peer.setRemoteDescription(sdp).then(() => { peer.createAnswer().then(answer => peer.setLocalDescription(answer)).then(() => { socket.emit('webrtc-answer', { targetSocketId: senderSocketId, sdp: peer.localDescription }); }); });
+    peer.onicecandidate = event => { if (event.candidate) { socket.emit('webrtc-ice-candidate', { targetSocketId: senderSocketId, candidate: event.candidate }); } };
     peer.ontrack = event => { setPeers(prev => prev.find(p => p.socketId === senderSocketId) ? prev : [...prev, { socketId: senderSocketId, stream: event.streams[0] }]); };
   }
 

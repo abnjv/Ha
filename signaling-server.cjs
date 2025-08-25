@@ -1,3 +1,4 @@
+console.log("Signaling server script started.");
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -116,6 +117,7 @@ io.on('connection', (socket) => {
   });
 });
 
+console.log("Attempting to start server on port", PORT);
 server.listen(PORT, () => {
   console.log(`Signaling server listening on *:${PORT}`);
 });
