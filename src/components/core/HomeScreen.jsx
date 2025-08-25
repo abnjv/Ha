@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LogOut, Users, User as UserIcon, Home, Bell, Sun, Radio, LifeBuoy, BarChart2 } from 'lucide-react';
-import io from 'socket.io-client';
 import { ThemeContext } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
@@ -12,7 +11,7 @@ import Upload from './Upload';
 const HomeScreen = ({ onToggleNotifications, unreadCount }) => {
   const { t } = useTranslation();
   const { isDarkMode, toggleDarkMode, themeClasses } = useContext(ThemeContext);
-  const { user, logout, db, appId } = useAuth();
+  const { user, logout, db, appId, socket } = useAuth();
   const navigate = useNavigate();
 
   const [rooms, setRooms] = useState([]);
@@ -21,14 +20,23 @@ const HomeScreen = ({ onToggleNotifications, unreadCount }) => {
   const [activeStreams, setActiveStreams] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const socketRef = useRef();
-
   useEffect(() => {
-    socketRef.current = io(import.meta.env.VITE_SIGNALING_SERVER_URL);
-    socketRef.current.on('new-stream-available', (streamId) => { setActiveStreams(prev => [...prev, streamId]); });
-    socketRef.current.on('stream-ended', (streamId) => { setActiveStreams(prev => prev.filter(id => id !== streamId)); });
-    return () => { socketRef.current.disconnect(); };
-  }, []);
+    if (!socket) return;
+
+    socket.on('new-stream-available', (streamId) => {
+      setActiveStreams(prev => [...prev, streamId]);
+    });
+
+    socket.on('stream-ended', (streamId) => {
+      setActiveStreams(prev => prev.filter(id => id !== streamId));
+    });
+
+    // Cleanup listeners on component unmount
+    return () => {
+      socket.off('new-stream-available');
+      socket.off('stream-ended');
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!db) return;

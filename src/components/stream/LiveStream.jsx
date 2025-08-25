@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import io from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeContext } from '../../context/ThemeContext';
 import { CornerUpLeft, Radio, XCircle, Users, Send } from 'lucide-react';
 
 const LiveStream = () => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, socket } = useAuth();
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -20,7 +19,6 @@ const LiveStream = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
 
-  const socketRef = useRef();
   const videoRef = useRef();
   const peersRef = useRef({}); // For broadcaster: { watcherId: RTCPeerConnection }
 
@@ -32,64 +30,65 @@ const LiveStream = () => {
   }, [location.pathname, params.streamId, user]);
 
   useEffect(() => {
-    if (!streamId) return;
+    if (!streamId || !socket) return;
 
-    socketRef.current = io(import.meta.env.VITE_SIGNALING_SERVER_URL);
-    socketRef.current.emit('join-room', streamId, user.uid);
+    socket.emit('join-room', streamId, user.uid);
 
-    if (isBroadcaster) {
-      // Logic for broadcaster is handled by button click
-    } else {
-      // Logic for watcher
-      socketRef.current.emit('watch-stream', streamId);
+    const handleStreamSignal = ({ signal }) => {
+      const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      peersRef.current['broadcaster'] = peer;
 
-      socketRef.current.on('stream-signal-from-broadcaster', ({ signal }) => {
-        const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        peersRef.current['broadcaster'] = peer;
-
-        peer.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        peer.createAnswer().then(answer => {
-          peer.setLocalDescription(answer);
-          socketRef.current.emit('watcher-signal-to-streamer', { broadcasterId: signal.broadcasterId, signal: { sdp: answer } });
-        });
-
-        peer.onicecandidate = event => {
-          if (event.candidate) {
-            socketRef.current.emit('watcher-signal-to-streamer', { broadcasterId: signal.broadcasterId, signal: { candidate: event.candidate } });
-          }
-        };
-
-        peer.ontrack = event => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = event.streams[0];
-          }
-        };
+      peer.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      peer.createAnswer().then(answer => {
+        peer.setLocalDescription(answer);
+        socket.emit('watcher-signal-to-streamer', { broadcasterId: signal.broadcasterId, signal: { sdp: answer } });
       });
-    }
 
-    socketRef.current.on('stream-ended', (endedStreamId) => {
+      peer.onicecandidate = event => {
+        if (event.candidate) {
+          socket.emit('watcher-signal-to-streamer', { broadcasterId: signal.broadcasterId, signal: { candidate: event.candidate } });
+        }
+      };
+
+      peer.ontrack = event => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = event.streams[0];
+        }
+      };
+    };
+
+    const handleStreamEnded = (endedStreamId) => {
       if (endedStreamId === streamId) {
         alert("The stream has ended.");
         navigate('/');
       }
-    });
+    };
+
+    if (!isBroadcaster) {
+      socket.emit('watch-stream', streamId);
+      socket.on('stream-signal-from-broadcaster', handleStreamSignal);
+    }
+
+    socket.on('stream-ended', handleStreamEnded);
 
     return () => {
-      socketRef.current.disconnect();
+      socket.off('stream-signal-from-broadcaster', handleStreamSignal);
+      socket.off('stream-ended', handleStreamEnded);
       if (isBroadcaster) handleStopStream();
       Object.values(peersRef.current).forEach(peer => peer.close());
     };
-  }, [streamId, isBroadcaster]);
+  }, [streamId, isBroadcaster, socket]);
 
   const handleGoLive = async () => {
+    if (!socket) return;
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setStream(mediaStream);
       videoRef.current.srcObject = mediaStream;
       setIsLive(true);
-      socketRef.current.emit('start-stream', streamId);
+      socket.emit('start-stream', streamId);
 
-      socketRef.current.on('new-watcher', ({ watcherId }) => {
+      const handleNewWatcher = ({ watcherId }) => {
         const peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
         peersRef.current[watcherId] = peer;
         setViewerCount(prev => prev + 1);
@@ -98,17 +97,17 @@ const LiveStream = () => {
 
         peer.onicecandidate = event => {
           if (event.candidate) {
-            socketRef.current.emit('stream-signal-to-watcher', { watcherId, signal: { candidate: event.candidate } });
+            socket.emit('stream-signal-to-watcher', { watcherId, signal: { candidate: event.candidate } });
           }
         };
 
         peer.createOffer().then(offer => {
           peer.setLocalDescription(offer);
-          socketRef.current.emit('stream-signal-to-watcher', { watcherId, signal: { sdp: offer, broadcasterId: socketRef.current.id } });
+          socket.emit('stream-signal-to-watcher', { watcherId, signal: { sdp: offer, broadcasterId: socket.id } });
         });
-      });
+      };
 
-      socketRef.current.on('watcher-signal', ({ watcherId, signal }) => {
+      const handleWatcherSignal = ({ watcherId, signal }) => {
         const peer = peersRef.current[watcherId];
         if (peer) {
           if (signal.sdp) {
@@ -117,7 +116,10 @@ const LiveStream = () => {
             peer.addIceCandidate(new RTCIceCandidate(signal.candidate));
           }
         }
-      });
+      };
+
+      socket.on('new-watcher', handleNewWatcher);
+      socket.on('watcher-signal', handleWatcherSignal);
 
     } catch (error) {
       console.error("Could not start stream:", error);
@@ -125,7 +127,8 @@ const LiveStream = () => {
   };
 
   const handleStopStream = () => {
-    socketRef.current.emit('stop-stream', streamId);
+    if (!socket) return;
+    socket.emit('stop-stream', streamId);
     stream?.getTracks().forEach(track => track.stop());
     setIsLive(false);
     setStream(null);
@@ -166,24 +169,28 @@ const LiveStream = () => {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (inputMessage.trim() && socketRef.current) {
+    if (inputMessage.trim() && socket) {
       const messageData = {
         text: inputMessage,
         user: userProfile.name,
         streamId: streamId,
       };
-      socketRef.current.emit('live-chat-message', messageData);
+      socket.emit('live-chat-message', messageData);
       setInputMessage('');
     }
   };
 
   useEffect(() => {
-    if (socketRef.current) {
-      socketRef.current.on('live-chat-message', (message) => {
+    if (socket) {
+      const handleChatMessage = (message) => {
         setChatMessages(prevMessages => [...prevMessages, message]);
-      });
+      };
+      socket.on('live-chat-message', handleChatMessage);
+      return () => {
+        socket.off('live-chat-message', handleChatMessage);
+      };
     }
-  }, [socketRef.current]);
+  }, [socket]);
 
   return (
     <div className={`flex h-screen ${themeClasses}`}>

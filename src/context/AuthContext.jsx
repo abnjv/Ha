@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import io from 'socket.io-client';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, updateDoc } from 'firebase/firestore';
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [firebaseError, setFirebaseError] = useState(null);
+  const socketRef = useRef(null);
 
   useEffect(() => {
     const initializeFirebase = () => {
@@ -137,6 +139,34 @@ export const AuthProvider = ({ children }) => {
     });
   }, [user]);
 
+  // Socket.io connection management
+  useEffect(() => {
+    if (user && !socketRef.current) {
+      const socket = io(import.meta.env.VITE_SIGNALING_SERVER_URL || 'http://localhost:3001');
+      socketRef.current = socket;
+
+      socket.emit('register', user.uid);
+
+      socket.on('room:invite', ({ fromName, roomId, roomType }) => {
+        sendNotification(user.uid, 'room_invite', `${fromName} has invited you to a room.`, { roomId, roomType });
+      });
+
+      // Listen for other global events here if necessary
+
+    } else if (!user && socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    // Cleanup on component unmount
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [user]);
+
   const sendNotification = async (targetUserId, type, message, payload = {}) => {
     if (!db) return;
     const notificationsPath = getUserNotificationsPath(appId, targetUserId);
@@ -192,6 +222,7 @@ export const AuthProvider = ({ children }) => {
     sendNotification,
     awardAchievement,
     updateUserProfile,
+    socket: socketRef.current,
   };
 
   if (firebaseError) {
