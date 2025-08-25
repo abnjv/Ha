@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Edit, X, Save, Plus, Globe, Gift, Award } from 'lucide-react';
+import { ArrowLeft, Edit, X, Save, Plus, Globe, Gift, Award, Crown } from 'lucide-react';
 import { ThemeContext } from '../../context/ThemeContext';
 import { doc, setDoc } from 'firebase/firestore';
 import DonationModal from '../donations/DonationModal';
@@ -14,7 +14,7 @@ const getLevelFromXP = (xp) => {
 
 const UserProfileScreen = () => {
   const { t, i18n } = useTranslation();
-  const { user, userProfile, db, appId } = useAuth();
+  const { user, userProfile, db, appId, updateUserProfile } = useAuth();
   const navigate = useNavigate();
   const { isDarkMode, themeClasses } = useContext(ThemeContext);
   const [isEditing, setIsEditing] = useState(false);
@@ -40,6 +40,28 @@ const UserProfileScreen = () => {
 
   const level = getLevelFromXP(userProfile?.xp || 0);
   // ... (level logic is unchanged)
+
+  const plans = [
+    { id: 'basic', name: 'الاشتراك الأساسي' },
+    { id: 'premium', name: 'الاشتراك المتميز' },
+  ];
+
+  const getPlanName = (planId) => {
+    const plan = plans.find(p => p.id === planId);
+    return plan ? plan.name : 'خطة غير معروفة';
+  };
+
+  const cancelSubscription = async () => {
+    if (window.confirm('هل أنت متأكد أنك تريد إلغاء اشتراكك؟')) {
+      try {
+        await updateUserProfile({ subscription: null });
+        alert('تم إلغاء الاشتراك بنجاح.');
+      } catch (error) {
+        console.error('Failed to cancel subscription:', error);
+        alert('فشل إلغاء الاشتراك. الرجاء المحاولة مرة أخرى.');
+      }
+    }
+  };
 
   return (
     <div className={`flex flex-col min-h-screen p-4 antialiased ${themeClasses}`}>
@@ -90,6 +112,28 @@ const UserProfileScreen = () => {
           )}
         </div>
 
+        <div className="mt-6 text-start">
+          <h3 className="text-lg font-bold mb-2 border-b border-gray-700 pb-1">الاشتراك</h3>
+          {userProfile?.subscription && userProfile.subscription.status === 'active' ? (
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <p className="font-bold text-lg">
+                أنت مشترك في الباقة: <span className="text-blue-400">{getPlanName(userProfile.subscription.planId)}</span>
+              </p>
+              <p className="text-sm text-gray-400">
+                تاريخ الاشتراك: {new Date(userProfile.subscription.subscribedAt).toLocaleDateString()}
+              </p>
+              <button
+                onClick={cancelSubscription}
+                className="w-full mt-4 p-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                إلغاء الاشتراك
+              </button>
+            </div>
+          ) : (
+            <p className="text-gray-400">أنت غير مشترك حاليًا.</p>
+          )}
+        </div>
+
         {isEditing && (
           <button onClick={handleSaveProfile} className="w-full mt-4 p-3 rounded-xl bg-green-600 hover:bg-green-700">
             <Save className="inline-block mr-2" />
@@ -107,6 +151,11 @@ const UserProfileScreen = () => {
       <button onClick={() => navigate('/achievements')} className="w-full py-3 px-6 bg-purple-600 text-white font-bold rounded-xl shadow-lg hover:bg-purple-700 transition duration-300 mt-4">
         <Award className="inline-block mr-2" />
         Achievements
+      </button>
+
+      <button onClick={() => navigate('/subscriptions')} className="w-full py-3 px-6 bg-teal-600 text-white font-bold rounded-xl shadow-lg hover:bg-teal-700 transition duration-300 mt-4">
+        <Crown className="inline-block mr-2" />
+        الاشتراكات
       </button>
 
       {!isEditing && user.uid !== userProfile.id && (

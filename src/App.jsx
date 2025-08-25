@@ -30,6 +30,7 @@ import TicketSystem from './components/support/TicketSystem';
 import TicketDetail from './components/support/TicketDetail';
 import AnalyticsDashboard from './components/analytics/AnalyticsDashboard';
 import AchievementsScreen from './components/achievements/AchievementsScreen';
+import SubscriptionSystem from './components/subscriptions/SubscriptionSystem';
 
 // ProtectedRoute component to guard routes that require authentication
 const ProtectedRoute = () => {
@@ -134,6 +135,7 @@ const AppContent = () => {
             <Route path="/support/ticket/:ticketId" element={<PageTransition><TicketDetail /></PageTransition>} />
             <Route path="/analytics" element={<PageTransition><AnalyticsDashboard /></PageTransition>} />
             <Route path="/achievements" element={<PageTransition><AchievementsScreen /></PageTransition>} />
+            <Route path="/subscriptions" element={<PageTransition><SubscriptionSystem /></PageTransition>} />
           </Route>
 
           {/* Redirect any unknown paths to the home page if logged in, or login if not */}
