@@ -168,6 +168,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserProfile = async (data) => {
+    if (!user || !db) return;
+    const userDocRef = doc(db, getUserProfilePath(appId, user.uid));
+    try {
+      await updateDoc(userDocRef, data, { merge: true });
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      // Optionally re-throw or handle the error in a specific way
+      throw error;
+    }
+  };
+
   const value = {
     user,
     userProfile,
@@ -179,6 +191,7 @@ export const AuthProvider = ({ children }) => {
     logout: () => signOut(auth),
     sendNotification,
     awardAchievement,
+    updateUserProfile,
   };
 
   if (firebaseError) {
